@@ -1,16 +1,20 @@
 #define WIN32_LEAN_AND_MEAN
 
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
+using namespace boost::iostreams;
+
 #include <windows.h> // #define win32_lean_and_mean required to include because winsock2 already includes core elements
 #include <winsock2.h> //includes core elements from Windows.h
 #include <ws2tcpip.h> //contains definitions/protocols for Winsocket
 //#include <iphlpapi.h> // IP Helper API
 #include <stdlib.h>
 #include <stdio.h>
-
-#include<iostream>
-#include<fstream>
-#include <boost/archive/text_oarchive.hpp>
-#include <boost/archive/text_iarchive.hpp>
 
 
 // Need to link with Ws2_32.lib, Mswsock.lib, and Advapi32.lib
@@ -21,6 +25,36 @@
 
 #define DEFAULT_BUFLEN 512
 #define DEFAULT_PORT "27015"
+
+class tst {
+public:
+	friend class boost::serialization::access;
+
+	tst(std::string sName, int sage, float spi)
+		:Name(sName), age(sage), pi(spi)
+	{}
+
+	tst() {
+	}
+
+	~tst() {
+
+	}
+
+	std::string Name;
+	int age;
+	float pi;
+
+	template<class Archive>
+	void serialize(Archive& ar, const unsigned int version) {
+		ar& Name;
+		ar& age;
+		ar& pi;
+	}
+
+
+};
+
 
 int __cdecl main(int argc, char** argv)
 {
@@ -127,7 +161,21 @@ int __cdecl main(int argc, char** argv)
 	do {
 		iResult = recv(ConnectSocket, recvbuf, recvbuflen, 0); // returns number of bytes received or error
 		if (iResult > 0)
+		{
 			printf("Bytes received: %d\n", iResult);
+			//std::istringstream iss(std::string(recvbuf));
+			//std::ifstream ifs((const char*)recvbuf);
+			std::stringstream ss;
+			ss.write(recvbuf, strlen(recvbuf));
+			boost::archive::text_iarchive ia(ss);
+
+			tst TT;
+			ia >> TT;
+
+			std::cout << TT.Name << std::endl;
+			std::cout << TT.age << std::endl;
+			std::cout << TT.pi << std::endl;
+		}
 		else if (iResult == 0)
 			printf("Connection closed\n");
 		else

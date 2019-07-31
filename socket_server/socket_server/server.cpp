@@ -2,8 +2,9 @@
 
 #define WIN32_LEAN_AND_MEAN
 
-#include<iostream>
-#include<fstream>
+#include <iostream>
+#include <fstream>
+#include <sstream>
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/iostreams/device/array.hpp>
@@ -113,26 +114,7 @@ int __cdecl main(void)
 	tst T("Tab", 31, 3.1415);
 	boost::archive::text_oarchive oa(os);
 	oa << T;
-	std::cout << buffer << std::endl;
-	std::cout << std::to_string(std::strlen(buffer)) << std::endl;
-	//---------------------
-	/*
-	char buffer2[500] = { 0, };
-	array_sink sink2{ buffer2 };
-	stream<array_sink> os2{ sink2 };
-	boost::archive::text_iarchive ia(os2);
 
-
-	std::ifstream input("output.txt", std::ios::binary);
-	boost::archive::text_iarchive ia(input);
-
-	tst TT;
-	ia >> TT;
-
-	std::cout << TT.Name << std::endl;
-	std::cout << TT.age << std::endl;
-	std::cout << TT.pi << std::endl;
-	*/
 	//---------------------
 
 
@@ -208,7 +190,7 @@ int __cdecl main(void)
 	WSACleanup();
 
 	
-	/*
+	
 	tst* pT = new tst("Bat", 13, 2.5);
 	std::ofstream pout("pout.txt", std::ios::binary);
 	boost::archive::text_oarchive poa(pout);
@@ -224,6 +206,6 @@ int __cdecl main(void)
 	std::cout << pTT->Name << std::endl;
 	std::cout << pTT->age << std::endl;
 	std::cout << pTT->pi << std::endl;
-	*/
+	
 	return 0;
 }
