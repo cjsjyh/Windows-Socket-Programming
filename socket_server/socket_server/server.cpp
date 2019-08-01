@@ -3,7 +3,6 @@
 #define WIN32_LEAN_AND_MEAN
 
 #include <iostream>
-#include <fstream>
 #include <sstream>
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
@@ -107,13 +106,24 @@ int __cdecl main(void)
 	freeaddrinfo(result);
 
 	//---------------------------
-	char buffer[500] = { 0, };
-	array_sink sink{ buffer };
-	stream<array_sink> os{ sink };
+	char buffer[3][500] = { 0, };
+	array_sink sink1{ buffer[0] };
+	stream<array_sink> os1{ sink1 };
+	array_sink sink2{ buffer[1] };
+	stream<array_sink> os2{ sink2 };
+	array_sink sink3{ buffer[2] };
+	stream<array_sink> os3{ sink3 };
 
-	tst T("Tab", 31, 3.1415);
-	boost::archive::text_oarchive oa(os);
-	oa << T;
+	tst T1("Tab", 1, 3.1415);
+	tst T2("Tab", 2, 3.1415);
+	tst T3("Tab", 3, 3.1415);
+	
+	boost::archive::text_oarchive oa1(os1);
+	oa1 << T1;
+	boost::archive::text_oarchive oa2(os2);
+	oa2 << T2;
+	boost::archive::text_oarchive oa3(os3);
+	oa3 << T3;
 
 	//---------------------
 
@@ -145,16 +155,41 @@ int __cdecl main(void)
 	int iSendResult;
 	char recvbuf[DEFAULT_BUFLEN];
 	int recvbuflen = DEFAULT_BUFLEN;
+	int count=0;
 
 	// Receive until the peer shuts down the connection
 	do {
-
-		iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
+		//iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
+		iResult = 1;
 		if (iResult > 0) {
-			printf("Bytes received: %d\n", iResult);
+			//printf("Bytes received: %d\n", iResult);
 
 			// Echo the buffer back to the sender
-			iSendResult = send(ClientSocket, buffer, strlen(buffer), 0);
+			buffer[0][strlen(buffer[0])] = '\n';
+			iSendResult = send(ClientSocket, buffer[0], strlen(buffer[0]), 0);
+			std::cout << buffer[0] << std::endl;
+			if (iSendResult == SOCKET_ERROR) {
+				printf("send failed with error: %d\n", WSAGetLastError());
+				closesocket(ClientSocket);
+				WSACleanup();
+				return 1;
+			}
+			printf("Bytes sent: %d\n", iSendResult);
+
+			buffer[1][strlen(buffer[1])] = '\n';
+			iSendResult = send(ClientSocket, buffer[1], strlen(buffer[1]), 0);
+			std::cout << buffer[1] << std::endl;
+			if (iSendResult == SOCKET_ERROR) {
+				printf("send failed with error: %d\n", WSAGetLastError());
+				closesocket(ClientSocket);
+				WSACleanup();
+				return 1;
+			}
+			printf("Bytes sent: %d\n", iSendResult);
+
+			buffer[2][strlen(buffer[2])] = '\n';
+			iSendResult = send(ClientSocket, buffer[2], strlen(buffer[2]), 0);
+			std::cout << buffer[2] << std::endl;
 			if (iSendResult == SOCKET_ERROR) {
 				printf("send failed with error: %d\n", WSAGetLastError());
 				closesocket(ClientSocket);
@@ -163,6 +198,7 @@ int __cdecl main(void)
 			}
 			printf("Bytes sent: %d\n", iSendResult);
 		}
+
 		else if (iResult == 0)
 			printf("Connection closing...\n");
 		else {
@@ -171,8 +207,11 @@ int __cdecl main(void)
 			WSACleanup();
 			return 1;
 		}
-
+		/*if (count++ > 2)
+			break;*/
+		iResult = 0;
 	} while (iResult > 0);
+
 	// shutdown the connection since we're done
 	iResult = shutdown(ClientSocket, SD_SEND);
 	if (iResult == SOCKET_ERROR) {
@@ -190,7 +229,7 @@ int __cdecl main(void)
 	WSACleanup();
 
 	
-	
+	/*
 	tst* pT = new tst("Bat", 13, 2.5);
 	std::ofstream pout("pout.txt", std::ios::binary);
 	boost::archive::text_oarchive poa(pout);
@@ -199,13 +238,13 @@ int __cdecl main(void)
 
 	std::ifstream pin("pout.txt", std::ios::binary);
 	boost::archive::text_iarchive pia(pin);
-
+	
 	tst* pTT;
 	pia >> pTT;
 
 	std::cout << pTT->Name << std::endl;
 	std::cout << pTT->age << std::endl;
 	std::cout << pTT->pi << std::endl;
-	
+	*/
 	return 0;
 }

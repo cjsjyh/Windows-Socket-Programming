@@ -15,7 +15,8 @@ using namespace boost::iostreams;
 //#include <iphlpapi.h> // IP Helper API
 #include <stdlib.h>
 #include <stdio.h>
-
+#include <vector>
+using namespace std;
 
 // Need to link with Ws2_32.lib, Mswsock.lib, and Advapi32.lib
 #pragma comment (lib, "Ws2_32.lib")
@@ -133,7 +134,7 @@ int __cdecl main(int argc, char** argv)
 	int recvbuflen = DEFAULT_BUFLEN;
 	char* sendbuf = (char*)"this is a test";
 	char recvbuf[DEFAULT_BUFLEN];
-	
+	vector<int> delimiterIndex;
 
 
 	// Send an initial buffer
@@ -159,22 +160,31 @@ int __cdecl main(int argc, char** argv)
 
 	// Receive until the peer closes the connection
 	do {
+		memset(recvbuf, 0, DEFAULT_BUFLEN);
 		iResult = recv(ConnectSocket, recvbuf, recvbuflen, 0); // returns number of bytes received or error
 		if (iResult > 0)
 		{
-			printf("Bytes received: %d\n", iResult);
-			//std::istringstream iss(std::string(recvbuf));
-			//std::ifstream ifs((const char*)recvbuf);
-			std::stringstream ss;
-			ss.write(recvbuf, strlen(recvbuf));
-			boost::archive::text_iarchive ia(ss);
+			delimiterIndex.clear();
+			for (int i = 0; i < strlen(recvbuf); i++)
+				if (recvbuf[i] == '\n')
+					delimiterIndex.push_back(i);
+			cout << "delimiter find done" << endl;
+			for (auto iter = delimiterIndex.begin(); iter != delimiterIndex.end(); iter++)
+			{
+				int messageLen = delimiterIndex[0];
+				std::stringstream ss;
+				ss.write(&(recvbuf[*iter - messageLen]), messageLen);
+				boost::archive::text_iarchive ia(ss);
 
-			tst TT;
-			ia >> TT;
+				tst TT;
+				ia >> TT;
 
-			std::cout << TT.Name << std::endl;
-			std::cout << TT.age << std::endl;
-			std::cout << TT.pi << std::endl;
+
+				std::cout << TT.Name << std::endl;
+				std::cout << TT.age << std::endl;
+				std::cout << TT.pi << std::endl << endl;
+			}
+			//DESERIALIZATION FROM CHAR*
 		}
 		else if (iResult == 0)
 			printf("Connection closed\n");
