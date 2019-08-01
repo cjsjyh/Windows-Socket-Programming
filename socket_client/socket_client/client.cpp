@@ -194,8 +194,10 @@ int __cdecl main(int argc, char** argv)
 	} while (iResult > 0);
 	
 	// cleanup
-	closesocket(ConnectSocket);
-	WSACleanup();
+	//closesocket(ConnectSocket);
+	//WSACleanup();
+	int temp;
+	cin >> temp;
 
 	return 0;
 }

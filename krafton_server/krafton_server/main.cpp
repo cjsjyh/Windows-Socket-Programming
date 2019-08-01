@@ -15,52 +15,17 @@ using namespace boost::iostreams;
 #include <ws2tcpip.h>
 #include <vector>
 
-#define BUFFER_SIZE 512
+#include "tst.h"
+#include "playerInfo.h"
 
 // Need to link with Ws2_32.lib
 #pragma comment (lib, "Ws2_32.lib")
 
-
-#define DEFAULT_BUFLEN 512
+#define BUFFER_SIZE 512
 #define DEFAULT_PORT "27015"
 
-int receiveMessage(SOCKET ConnectSocket);
-bool sendMessage(SOCKET ConnectSocket);
+#include "main.h"
 
-
-class tst {
-public:
-	friend class boost::serialization::access;
-
-	tst(std::string sName, int sage, float spi)
-		:Name(sName), age(sage), pi(spi)
-	{}
-
-	tst() {
-	}
-
-	~tst() {
-
-	}
-
-	std::string Name;
-	int age;
-	float pi;
-
-	template<class Archive>
-	void serialize(Archive& ar, const unsigned int version) {
-		ar& Name;
-		ar& age;
-		ar& pi;
-	}
-
-
-};
-
-
-char sendBuffer[BUFFER_SIZE];
-char recvBuffer[BUFFER_SIZE];
-std::vector<int> delimiterIndex;
 
 int __cdecl main(void)
 {
@@ -140,10 +105,17 @@ int __cdecl main(void)
 
 	// Receive until the peer shuts down the connection
 	do {
-		iResult = receiveMessage(ClientSocket);
+		//iResult = receiveMessage(ClientSocket);
+		
+		if (sendMessage(ClientSocket) == -1)
+			break;
+		if (count++ > 2)
+			break;
+
 		iResult = 1;
+
 		if (iResult > 0) {
-			sendMessage(ClientSocket);
+			//sendMessage(ClientSocket);
 			std::cout << "Message Sent" << std::endl;
 		}
 
@@ -155,13 +127,12 @@ int __cdecl main(void)
 			WSACleanup();
 			return 1;
 		}
-
-		if (count++ > 8)
-			break;
-		iResult = 1;
 	} while (iResult > 0);
 
+
+	std::cout << "Shutting down client socket" << std::endl;
 	// shutdown the connection since we're done
+
 	iResult = shutdown(ClientSocket, SD_SEND);
 	if (iResult == SOCKET_ERROR) {
 		printf("shutdown failed with error: %d\n", WSAGetLastError());
@@ -170,13 +141,9 @@ int __cdecl main(void)
 		return 1;
 	}
 
-	//printf("%s\n", recvbuf);
-	//scanf_s("%d", &iResult);
-
 	// cleanup
 	closesocket(ClientSocket);
 	WSACleanup();
-
 
 	return 0;
 }
@@ -219,7 +186,7 @@ int receiveMessage(SOCKET ConnectSocket)
 	return iResult;
 }
 
-bool sendMessage(SOCKET ClientSocket)
+int sendMessage(SOCKET ClientSocket)
 {
 	int iSendResult;
 	memset(sendBuffer, 0, sizeof(sendBuffer));
@@ -227,7 +194,12 @@ bool sendMessage(SOCKET ClientSocket)
 	array_sink sink{ sendBuffer };
 	stream<array_sink> os{ sink };
 
-	tst T("Tab", 31, 3.1415);
+	bool tempBool[] = { true, false, false };
+	int tempInt[10];
+	tempInt[0] = 0x11;
+	playerInfo T(1,100,100,tempBool,tempInt);
+
+
 	boost::archive::text_oarchive oa(os);
 	oa << T;
 
@@ -238,20 +210,11 @@ bool sendMessage(SOCKET ClientSocket)
 		printf("send failed with error: %d\n", WSAGetLastError());
 		closesocket(ClientSocket);
 		WSACleanup();
-		return false;
+		return -1;
 	}
-	printf("Bytes sent: %d\n", iSendResult);
 
 	std::cout << sendBuffer << std::endl;
-	// Echo the buffer back to the sender
-	iSendResult = send(ClientSocket, sendBuffer, strlen(sendBuffer), 0);
-	if (iSendResult == SOCKET_ERROR) {
-		printf("send failed with error: %d\n", WSAGetLastError());
-		closesocket(ClientSocket);
-		WSACleanup();
-		return false;
-	}
 	printf("Bytes sent: %d\n", iSendResult);
 
-	return true;
+	return iSendResult;
 }
