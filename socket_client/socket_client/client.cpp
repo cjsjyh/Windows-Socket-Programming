@@ -88,9 +88,9 @@ int __cdecl main(int argc, char** argv)
 	hints.ai_protocol = IPPROTO_TCP;
 
 	SOCKET ConnectSocket = INVALID_SOCKET;
-	
+
 	// Resolve the server address and port
-	iResult = getaddrinfo(argv[1], DEFAULT_PORT, &hints, &result);
+	iResult = getaddrinfo("", DEFAULT_PORT, &hints, &result);
 	if (iResult != 0) {
 		printf("getaddrinfo failed with error: %d\n", iResult);
 		WSACleanup();
