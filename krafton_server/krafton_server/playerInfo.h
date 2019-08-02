@@ -11,9 +11,9 @@ public:
 	playerInfo(int _playerID, int _mouseX, int _mouseY, bool* _mouseInput, int* _keyInput)
 		:playerID(_playerID), mouseX(_mouseX), mouseY(_mouseY)
 	{
-		for (int i = 0; i < sizeof(mouseInput); i++)
+		for (int i = 0; i < sizeof(_mouseInput); i++)
 			mouseInput[i] = _mouseInput[i];
-		for (int i = 0; i < sizeof(keyInput) / sizeof(int); i++)
+		for (int i = 0; i < sizeof(_keyInput) / sizeof(int); i++)
 			keyInput[i] = _keyInput[i];
 	}
 

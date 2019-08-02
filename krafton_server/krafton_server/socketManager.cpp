@@ -4,6 +4,7 @@
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
+#include <boost/serialization/vector.hpp>
 using namespace boost::iostreams;
 
 
@@ -88,7 +89,7 @@ int socketManager::Initialize()
 	//--------------------------------------
 
 	CheckNewConnection();
-	CheckNewConnection();
+	//CheckNewConnection();
 
 	
 	return 1;
@@ -125,9 +126,6 @@ void socketManager::Shutdown()
 
 void socketManager::Frame()
 {
-	std::cout << "count:" + std::to_string(count++) << std::endl;
-
-
 	PushToClients();
 }
 
@@ -148,7 +146,7 @@ void socketManager::PushToClients()
 	{
 		if (sendMessage(*iter) == -1)
 			index.push_back(distance(ClientSocket.begin(), iter));
-		std::cout << "PUSH" << std::endl;
+		std::cout << "count:" + std::to_string(count++) << std::endl;
 	}
 	CloseClientSockets(index);
 	return;
@@ -192,7 +190,7 @@ int socketManager::receiveMessage(SOCKET ConnectSocket)
 				std::cout << "mouseX: " << pInfo.mouseX << std::endl;
 				std::cout << "mouseY: " << pInfo.mouseY << std::endl << std::endl;
 			}
-			//DESERIALIZATION FROM CHAR*
+			
 		}
 	}
 	else if (iResult == 0)
@@ -211,10 +209,13 @@ int socketManager::sendMessage(SOCKET ClientSocket)
 	array_sink sink{ sendBuffer };
 	stream<array_sink> os{ sink };
 
-	bool tempBool[] = { true, false, false };
+	bool tempBool[3];
+	for (int i = 0; i < 3; i++)
+		tempBool[i] = true;
 	int tempInt[10];
-	tempInt[0] = 0x11;
-	playerInfo T(1, 100, 100, tempBool, tempInt);
+	for (int i=0;i<10;i++)
+		tempInt[i] = 0x11;
+	playerInfo T(88, count, 0, tempBool, tempInt);
 
 
 	boost::archive::text_oarchive oa(os);
@@ -224,12 +225,17 @@ int socketManager::sendMessage(SOCKET ClientSocket)
 	std::string msgLen = std::to_string(strlen(sendBuffer));
 	const char* msgLenChar = msgLen.c_str();
 	iSendResult = send(ClientSocket, msgLenChar, sizeof(int), 0);
-
+	if (iSendResult == SOCKET_ERROR) {
+		printf("send failed with error: %d\n", WSAGetLastError());
+		//closesocket(ClientSocket);
+		//WSACleanup();
+		return -1;
+	}
 	iSendResult = send(ClientSocket, sendBuffer, strlen(sendBuffer), 0);
 	if (iSendResult == SOCKET_ERROR) {
 		printf("send failed with error: %d\n", WSAGetLastError());
-		closesocket(ClientSocket);
-		WSACleanup();
+		//closesocket(ClientSocket);
+		//WSACleanup();
 		return -1;
 	}
 
