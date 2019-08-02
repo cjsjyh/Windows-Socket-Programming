@@ -126,7 +126,11 @@ void socketManager::Shutdown()
 
 void socketManager::Frame()
 {
-	PushToClients();
+	for (auto iter = ClientSocket.begin(); iter != ClientSocket.end(); iter++)
+	{
+		if(receiveMessage(*iter) != -1)
+			PushToClients();
+	}	
 }
 
 void socketManager::CloseClientSockets(std::vector<int> index)
