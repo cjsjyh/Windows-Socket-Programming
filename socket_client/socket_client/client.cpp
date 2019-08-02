@@ -18,14 +18,26 @@ using namespace boost::iostreams;
 #include <vector>
 using namespace std;
 
+#include "playerInfo.h"
+
 // Need to link with Ws2_32.lib, Mswsock.lib, and Advapi32.lib
 #pragma comment (lib, "Ws2_32.lib")
 #pragma comment (lib, "Mswsock.lib")
 #pragma comment (lib, "AdvApi32.lib")
 
 
-#define DEFAULT_BUFLEN 512
+#define BUFFER_SIZE 512
 #define DEFAULT_PORT "27015"
+
+int Initialize();
+int receiveMessage(SOCKET);
+int sendMessage(SOCKET);
+
+char sendBuffer[BUFFER_SIZE];
+char recvBuffer[BUFFER_SIZE];
+std::vector<int> delimiterIndex;
+SOCKET ConnectSocket;
+int counter;
 
 class tst {
 public:
@@ -59,17 +71,34 @@ public:
 
 int __cdecl main(int argc, char** argv)
 {
-	//--------------------
-	//Setup Socket
-	//--------------------
-	/*
-	// Validate the parameters
-	if (argc != 2) {
-		printf("usage: %s server-name\n", argv[0]);
-		return 1;
+	int iResult;
+
+	Initialize();
+	counter = 0;
+	while (1)
+	{
+		iResult = receiveMessage(ConnectSocket);
+
+		if (iResult > 0) {
+			std::cout << "Message Received: " + std::to_string(iResult) + " Bytes" << std::endl;
+		}
+		else if (iResult == 0)
+			printf("Connection closing...\n");
+		else {
+			printf("recv failed with error: %d\n", WSAGetLastError());
+			closesocket(ConnectSocket);
+			WSACleanup();
+			return false;
+		}
 	}
-	*/
-	// Initialize Winsock
+
+
+	return 0;
+}
+
+
+int Initialize()
+{
 	WSADATA wsaData; //Contains information aout the Windows Sockets implementation.
 	int iResult;
 	iResult = WSAStartup(MAKEWORD(2, 2), &wsaData); // initiate the use of WS2_32.dll // = Winsock version 2.2 used
@@ -87,7 +116,7 @@ int __cdecl main(int argc, char** argv)
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_protocol = IPPROTO_TCP;
 
-	SOCKET ConnectSocket = INVALID_SOCKET;
+	ConnectSocket = INVALID_SOCKET;
 
 	// Resolve the server address and port
 	iResult = getaddrinfo("", DEFAULT_PORT, &hints, &result);
@@ -127,77 +156,89 @@ int __cdecl main(int argc, char** argv)
 		WSACleanup();
 		return 1;
 	}
-
-	//-------------------------
-	// SEND AND RECEIVE DATA
-	//-------------------------
-	int recvbuflen = DEFAULT_BUFLEN;
-	char* sendbuf = (char*)"this is a test";
-	char recvbuf[DEFAULT_BUFLEN];
-	vector<int> delimiterIndex;
-
-
-	// Send an initial buffer
-	iResult = send(ConnectSocket, sendbuf, (int)strlen(sendbuf), 0); // returns number of bytes sent or error
-	if (iResult == SOCKET_ERROR) {
-		printf("send failed with error: %d\n", WSAGetLastError());
-		closesocket(ConnectSocket);
-		WSACleanup();
-		return 1;
-	}
-
-	printf("Bytes Sent: %ld\n", iResult);
-
-	// shutdown the sending side of the socket. this allows server to release some resources.
-	// the client can still use the ConnectSocket for receiving data
-	iResult = shutdown(ConnectSocket, SD_SEND);
-	if (iResult == SOCKET_ERROR) {
-		printf("shutdown failed with error: %d\n", WSAGetLastError());
-		closesocket(ConnectSocket);
-		WSACleanup();
-		return 1;
-	}
-
-	// Receive until the peer closes the connection
-	do {
-		memset(recvbuf, 0, DEFAULT_BUFLEN);
-		iResult = recv(ConnectSocket, recvbuf, recvbuflen, 0); // returns number of bytes received or error
+	return 0;
+}
+int receiveMessage(SOCKET ConnectSocket)
+{
+	int iResult;
+	//First receive size of data that needs to be read
+	memset(recvBuffer, 0, sizeof(recvBuffer));
+	iResult = recv(ConnectSocket, recvBuffer, sizeof(int), 0);
+	if (iResult > 0)
+	{
+		cout << "count: " + to_string(counter++) << endl;
+		//read to know how many bytes to receive
+		int msgLen = std::stoi(recvBuffer);
+		memset(recvBuffer, 0, sizeof(recvBuffer));
+		//read real messages
+		iResult = recv(ConnectSocket, recvBuffer, msgLen, 0); // returns number of bytes received or error
 		if (iResult > 0)
 		{
+			//FIND \n INDEX
 			delimiterIndex.clear();
-			for (int i = 0; i < strlen(recvbuf); i++)
-				if (recvbuf[i] == '\n')
+			for (int i = 0; i < strlen(recvBuffer); i++)
+				if (recvBuffer[i] == '\n')
 					delimiterIndex.push_back(i);
-			cout << "delimiter find done" << endl;
-			for (auto iter = delimiterIndex.begin(); iter != delimiterIndex.end(); iter++)
+
+			//HANDLE EACH MESSAGE BY DELIMITER
+			int prevEnd = -1;
+			for (int i = 0; i < delimiterIndex.size(); i++)
 			{
-				int messageLen = delimiterIndex[0];
+				int messageLen = delimiterIndex[i];
 				std::stringstream ss;
-				ss.write(&(recvbuf[*iter - messageLen]), messageLen);
+				ss.write(&(recvBuffer[prevEnd + 1]), delimiterIndex[i] - (prevEnd + 1));
 				boost::archive::text_iarchive ia(ss);
+				prevEnd = delimiterIndex[i] + 1;
+				playerInfo pInfo;
+				ia >> pInfo;
 
-				tst TT;
-				ia >> TT;
-
-
-				std::cout << TT.Name << std::endl;
-				std::cout << TT.age << std::endl;
-				std::cout << TT.pi << std::endl << endl;
+				std::cout << "ID: " << pInfo.playerID << std::endl;
+				std::cout << "mouseX: " << pInfo.mouseX << std::endl;
+				std::cout << "mouseY: " << pInfo.mouseY << std::endl << std::endl;
 			}
 			//DESERIALIZATION FROM CHAR*
 		}
-		else if (iResult == 0)
-			printf("Connection closed\n");
-		else
-			printf("recv failed with error: %d\n", WSAGetLastError());
+	}
+	else if (iResult == 0)
+		printf("Connection closed\n");
+	else
+		printf("recv failed with error: %d\n", WSAGetLastError());
 
-	} while (iResult > 0);
-	
-	// cleanup
-	//closesocket(ConnectSocket);
-	//WSACleanup();
-	int temp;
-	cin >> temp;
+	return iResult;
+}
 
-	return 0;
+int sendMessage(SOCKET ClientSocket)
+{
+	int iSendResult;
+	memset(sendBuffer, 0, sizeof(sendBuffer));
+
+	array_sink sink{ sendBuffer };
+	stream<array_sink> os{ sink };
+
+	bool tempBool[] = { true, false, false };
+	int tempInt[10];
+	tempInt[0] = 0x11;
+	playerInfo T(1, 100, 100, tempBool, tempInt);
+
+
+	boost::archive::text_oarchive oa(os);
+	oa << T;
+	sendBuffer[strlen(sendBuffer)] = '\n';
+
+	std::string msgLen = std::to_string(strlen(sendBuffer));
+	const char* msgLenChar = msgLen.c_str();
+	iSendResult = send(ClientSocket, msgLenChar, sizeof(int), 0);
+
+	iSendResult = send(ClientSocket, sendBuffer, strlen(sendBuffer), 0);
+	if (iSendResult == SOCKET_ERROR) {
+		printf("send failed with error: %d\n", WSAGetLastError());
+		closesocket(ClientSocket);
+		WSACleanup();
+		return -1;
+	}
+
+	std::cout << sendBuffer << std::endl;
+	printf("Bytes sent: %d\n", iSendResult);
+
+	return iSendResult;
 }

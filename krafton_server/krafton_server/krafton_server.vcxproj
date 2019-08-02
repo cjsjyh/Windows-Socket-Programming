@@ -130,12 +130,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="applicationClass.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="playerInfo.cpp" />
+    <ClCompile Include="socketManager.cpp" />
     <ClCompile Include="tst.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="applicationClass.h" />
     <ClInclude Include="playerInfo.h" />
+    <ClInclude Include="socketManager.h" />
     <ClInclude Include="tst.h" />
     <ClInclude Include="main.h" />
   </ItemGroup>

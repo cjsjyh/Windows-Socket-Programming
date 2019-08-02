@@ -1,5 +1,6 @@
 #pragma once
 
+
 class tst {
 public:
 	friend class boost::serialization::access;
