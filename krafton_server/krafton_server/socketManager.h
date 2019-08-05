@@ -48,7 +48,7 @@ private:
 	//Last is NULL waiting for new connection
 	std::vector<SOCKET> ClientSocket;
 	SOCKET ListenSocket;
-
+	playerInfo pInfo;
 	int count;
 };
 

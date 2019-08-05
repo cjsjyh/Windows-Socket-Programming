@@ -1,5 +1,3 @@
-
-
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/iostreams/device/array.hpp>
@@ -8,8 +6,6 @@
 using namespace boost::iostreams;
 
 
-
-#include "playerInfo.h"
 
 #include "socketManager.h"
 
@@ -107,12 +103,19 @@ bool socketManager::CheckNewConnection()
 		return false;
 	}
 	else {
+		std::string clientId = std::to_string(ClientSocket.size() - 1);
+		const char* clientIdChar = clientId.c_str();
+		int iSendResult = send(ClientSocket[ClientSocket.size() - 1], clientIdChar, sizeof(int), 0);
+		printf("Client ID Sent\n");
+
 		SOCKET tempSocket = INVALID_SOCKET;
 		ClientSocket.push_back(tempSocket);
 		printf("Client Connected\n");
-		return true;
+
+		if(iSendResult > 0)
+			return true;
+		return false;
 	}
-	std::cout << "accept done" << std::endl;
 }
 
 void socketManager::Shutdown()
@@ -187,7 +190,6 @@ int socketManager::receiveMessage(SOCKET ConnectSocket)
 				ss.write(&(recvBuffer[prevEnd + 1]), delimiterIndex[i] - (prevEnd + 1));
 				boost::archive::text_iarchive ia(ss);
 				prevEnd = delimiterIndex[i] + 1;
-				playerInfo pInfo;
 				ia >> pInfo;
 
 				std::cout << "ID: " << pInfo.playerID << std::endl;
@@ -213,13 +215,13 @@ int socketManager::sendMessage(SOCKET ClientSocket)
 	array_sink sink{ sendBuffer };
 	stream<array_sink> os{ sink };
 
-	bool tempBool[3];
+	/*bool tempBool[3];
 	for (int i = 0; i < 3; i++)
-		tempBool[i] = true;
+		tempBool[i] = pInfo.mouseInput[i];
 	int tempInt[10];
 	for (int i=0;i<10;i++)
-		tempInt[i] = 0x11;
-	playerInfo T(88, count, 0, tempBool, tempInt);
+		tempInt[i] = pInfo.keyInput[i];*/
+	playerInfo T(88, count, 0, pInfo.mouseInput, pInfo.keyInput);
 
 
 	boost::archive::text_oarchive oa(os);
@@ -248,3 +250,43 @@ int socketManager::sendMessage(SOCKET ClientSocket)
 
 	return iSendResult;
 }
+
+
+
+class playerInfo
+{
+
+public:
+	friend class boost::serialization::access;
+
+	playerInfo(int _playerId, int _mouseX, int _mouseY, bool* _mouseInput, int* _keyInput)
+		:playerId(_playerId), mouseX(_mouseX), mouseY(_mouseY)
+	{
+		for (int i = 0; i < sizeof(_mouseInput); i++)
+			mouseInput[i] = _mouseInput[i];
+		for (int i = 0; i < sizeof(keyInput) / sizeof(int); i++)
+			keyInput[i] = _keyInput[i];
+	}
+
+	playerInfo() {
+	}
+
+	~playerInfo() {
+
+	}
+	int playerId;
+	int mouseX;
+	int mouseY;
+
+	bool mouseInput[3];
+	int keyInput[10];
+
+	template<class Archive>
+	void serialize(Archive& ar, const unsigned int version) {
+		ar& playerId;
+		ar& mouseX;
+		ar& mouseY;
+		ar& mouseInput;
+		ar& keyInput;
+	}
+};
