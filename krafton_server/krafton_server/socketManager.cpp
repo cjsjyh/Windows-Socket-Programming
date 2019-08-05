@@ -1,11 +1,12 @@
-#include <boost/archive/text_oarchive.hpp>
-#include <boost/archive/text_iarchive.hpp>
-#include <boost/iostreams/device/array.hpp>
-#include <boost/iostreams/stream.hpp>
-#include <boost/serialization/vector.hpp>
-using namespace boost::iostreams;
+#undef UNICODE
 
-#include "playerInfo.h"
+#define WIN32_LEAN_AND_MEAN
+
+#include <iostream>
+#include <sstream>
+#include <vector>
+#include <string>
+
 
 #include "socketManager.h"
 
@@ -191,10 +192,10 @@ int socketManager::receiveMessage(SOCKET ConnectSocket)
 				boost::archive::text_iarchive ia(ss);
 				prevEnd = delimiterIndex[i] + 1;
 				
-				playerInfo pInfo;
+				//playerInfo pInfo;
 				ia >> pInfo;
 
-				std::cout << "ID: " << pInfo.playerID << std::endl;
+				std::cout << "ID: " << pInfo.playerId << std::endl;
 				std::cout << "mouseX: " << pInfo.mouseX << std::endl;
 				std::cout << "mouseY: " << pInfo.mouseY << std::endl << std::endl;
 			}
@@ -217,17 +218,17 @@ int socketManager::sendMessage(SOCKET ClientSocket)
 	array_sink sink{ sendBuffer };
 	stream<array_sink> os{ sink };
 
-	bool tempBool[3];
+	/*bool tempBool[3];
 	for (int i = 0; i < 3; i++)
-		tempBool[i] = true;//pInfo.mouseInput[i];
+		tempBool[i] = pInfo.mouseInput[i];
 	int tempInt[10];
 	for (int i = 0; i < 10; i++)
-		tempInt[i] = 0x11;//pInfo.keyInput[i];
-	playerInfo T(88, count, 0, tempBool, tempInt);
+		tempInt[i] = pInfo.keyInput[i];*/
+	//playerInfo T(0, count, 0, pInfo.mouseInput, pInfo.keyInput);
 
 
 	boost::archive::text_oarchive oa(os);
-	oa << T;
+	oa << pInfo;//T;
 	sendBuffer[strlen(sendBuffer)] = '\n';
 
 	std::string msgLen = std::to_string(strlen(sendBuffer));

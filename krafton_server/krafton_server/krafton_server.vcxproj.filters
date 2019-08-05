@@ -24,9 +24,6 @@
     <ClCompile Include="applicationClass.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="playerInfo.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="main.h">
@@ -36,9 +33,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="applicationClass.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="playerInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
