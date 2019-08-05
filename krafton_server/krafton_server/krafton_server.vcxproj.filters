@@ -18,20 +18,17 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="tst.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="socketManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="applicationClass.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="playerInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="tst.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="main.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -39,6 +36,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="applicationClass.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="playerInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
