@@ -5,14 +5,30 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
+
 #include <string>
+
 
 
 #include "socketManager.h"
 
+#define CLIENT_COUNT 1
+
 socketManager::socketManager()
 {
 	count = 0;
+
+	for (int i = 0; i < CLIENT_COUNT; i++)
+	{
+		SOCKET tempSocket = INVALID_SOCKET;
+		clientSocket.push_back(tempSocket);
+
+		std::queue<playerInfo*> tempQueue;
+		clientReadBuffer.push_back(tempQueue);
+
+		std::mutex* tempMutex = new std::mutex();
+		threadLock.push_back(tempMutex);
+	}
 }
 
 socketManager::~socketManager()
@@ -68,9 +84,6 @@ int socketManager::Initialize()
 
 	freeaddrinfo(result);
 
-
-	printf("Preparing to Listen\n");
-
 	iResult = listen(ListenSocket, SOMAXCONN);
 	if (iResult == SOCKET_ERROR) {
 		printf("listen failed with error: %d\n", WSAGetLastError());
@@ -80,41 +93,91 @@ int socketManager::Initialize()
 	}
 
 	printf("Listening\n");
+	//Connect with Clients. Retry on failure
+	for (int i = 0; i < CLIENT_COUNT; i++)
+		if (!CheckNewConnection(i))
+			--i;
 
-	SOCKET tempSocket = INVALID_SOCKET;
-	ClientSocket.push_back(tempSocket);
-	//--------------------------------------
+	//Make new thread for each Client
+	for (int i = 0; i < CLIENT_COUNT; i++)
+		clientThread.push_back(std::thread([&,i]() {ListenToClients(i);}));
 
-	CheckNewConnection();
-	//CheckNewConnection();
-
+	//detach threads
+	for (int i = 0; i < CLIENT_COUNT; i++)
+		clientThread[i].detach();
+	
 	
 	return 1;
 }
 
-bool socketManager::CheckNewConnection()
+void socketManager::ListenToClients(int clientId)
 {
-	// Accept a client socket
-	std::cout << "starting accept" << std::endl;
-	ClientSocket[ClientSocket.size()-1] = accept(ListenSocket, NULL, NULL);
-	if (ClientSocket[ClientSocket.size() - 1] == INVALID_SOCKET) {
+	bool flag = true;
+	std::cout << "Client ID: " + std::to_string(clientId) << std::endl;
+	while (flag)
+	{
+		playerInfo* tempMsg = receiveMessage(clientSocket[clientId]);
+		if (tempMsg == NULL)
+		{
+			printf("Receive Failed. terminating thread");
+			flag = false;
+		}
+		else
+		{
+			threadLock[clientId]->lock();
+			std::cout << "Before ReadBufferSize: " + std::to_string(clientReadBuffer.size()) << std::endl;
+			std::cout << "[thread]ID: " << tempMsg->playerId << std::endl;
+			std::cout << "[thread]mouseX: " << tempMsg->mouseX << std::endl;
+			std::cout << "[thread]mouseY: " << tempMsg->mouseY << std::endl << std::endl;
+			clientReadBuffer[clientId].push(tempMsg);
+			std::cout << "After ReadBufferSize: " + std::to_string(clientReadBuffer.size()) << std::endl;
+			threadLock[clientId]->unlock();
+		}
+	}
+}
+
+void socketManager::PushToClients()
+{
+	std::vector<int> index;
+
+	int size = clientSendBuffer.size();
+	for (int i = 0; i < size; i++)
+	{
+		for (auto iter = clientSocket.begin(); iter != clientSocket.end(); iter++)
+		{
+			if (sendMessage(*iter, clientSendBuffer.front()) == -1)
+				index.push_back(distance(clientSocket.begin(), iter));
+		}
+		clientSendBuffer.pop();
+	}
+
+	//close invalid sockets
+	CloseClientSockets(index);
+	return;
+}
+
+
+bool socketManager::CheckNewConnection(int index)
+{
+	//Accept a client socket
+	clientSocket[index] = accept(ListenSocket, NULL, NULL);
+	
+	//Socket Connection Failed
+	if (clientSocket[index] == INVALID_SOCKET) {
 		printf("accept failed with error: %d\n", WSAGetLastError());
-		//closesocket(ListenSocket);
-		WSACleanup();
 		return false;
 	}
+	//Socket Connection Successful
 	else {
-		std::string clientId = std::to_string(ClientSocket.size() - 1);
+		std::string clientId = std::to_string(index);
 		const char* clientIdChar = clientId.c_str();
-		int iSendResult = send(ClientSocket[ClientSocket.size() - 1], clientIdChar, sizeof(int), 0);
+		int iSendResult = send(clientSocket[index], clientIdChar, sizeof(int), 0);
 		printf("Client ID Sent\n");
 
-		SOCKET tempSocket = INVALID_SOCKET;
-		ClientSocket.push_back(tempSocket);
-		printf("Client Connected\n");
-
-		if(iSendResult > 0)
+		if (iSendResult > 0)
 			return true;
+		//If failed to send client id, close and reconnect
+		closesocket(clientSocket[index]);
 		return false;
 	}
 }
@@ -122,7 +185,7 @@ bool socketManager::CheckNewConnection()
 void socketManager::Shutdown()
 {
 	closesocket(ListenSocket);
-	for(auto iter = ClientSocket.begin(); iter != ClientSocket.end(); iter++)
+	for(auto iter = clientSocket.begin(); iter != clientSocket.end(); iter++)
 		closesocket(*iter);
 	WSACleanup();
 }
@@ -130,11 +193,21 @@ void socketManager::Shutdown()
 
 void socketManager::Frame()
 {
-	for (auto iter = ClientSocket.begin(); iter != ClientSocket.end(); iter++)
+	for (int i = 0; i < CLIENT_COUNT; i++)
 	{
-		if(receiveMessage(*iter) != -1)
-			PushToClients();
-	}	
+		if (clientReadBuffer[i].size() != 0)
+		{
+			threadLock[i]->lock();
+			while (clientReadBuffer[i].size() != 0)
+			{
+				clientSendBuffer.push(clientReadBuffer[i].front());
+				clientReadBuffer[i].pop();
+			}
+			threadLock[i]->unlock();
+		}
+	}
+
+	PushToClients();
 }
 
 void socketManager::CloseClientSockets(std::vector<int> index)
@@ -142,28 +215,17 @@ void socketManager::CloseClientSockets(std::vector<int> index)
 	for (auto iter = index.end(); iter != index.begin(); iter--)
 	{
 		std::cout << "Closing client id: " + std::to_string(*iter) << std::endl;;
-		closesocket(ClientSocket[*iter]);
-		ClientSocket.erase(ClientSocket.begin() + *iter);
+		closesocket(clientSocket[*iter]);
+		clientSocket.erase(clientSocket.begin() + *iter);
 	}
 }
 
-void socketManager::PushToClients()
-{
-	std::vector<int> index;
-	for (auto iter = ClientSocket.begin(); iter != ClientSocket.end() - 1; iter++)
-	{
-		if (sendMessage(*iter) == -1)
-			index.push_back(distance(ClientSocket.begin(), iter));
-		std::cout << "count:" + std::to_string(count++) << std::endl;
-	}
-	CloseClientSockets(index);
-	return;
-}
-
-
-int socketManager::receiveMessage(SOCKET ConnectSocket)
+playerInfo* socketManager::receiveMessage(SOCKET ConnectSocket)
 {
 	int iResult;
+	playerInfo* pInfoPtr = new playerInfo;
+	playerInfo pInfo;
+
 	//First receive size of data that needs to be read
 	memset(recvBuffer, 0, sizeof(recvBuffer));
 	iResult = recv(ConnectSocket, recvBuffer, sizeof(int), 0);
@@ -172,6 +234,7 @@ int socketManager::receiveMessage(SOCKET ConnectSocket)
 		//read to know how many bytes to receive
 		int msgLen = std::stoi(recvBuffer);
 		memset(recvBuffer, 0, sizeof(recvBuffer));
+
 		//read real messages
 		iResult = recv(ConnectSocket, recvBuffer, msgLen, 0); // returns number of bytes received or error
 		if (iResult > 0)
@@ -188,29 +251,30 @@ int socketManager::receiveMessage(SOCKET ConnectSocket)
 			{
 				int messageLen = delimiterIndex[i];
 				std::stringstream ss;
-				ss.write(&(recvBuffer[prevEnd + 1]), delimiterIndex[i] - (prevEnd + 1));
+				ss.write(&(recvBuffer[prevEnd + 1]), delimiterIndex[i] - (prevEnd + 1) );
 				boost::archive::text_iarchive ia(ss);
 				prevEnd = delimiterIndex[i] + 1;
 				
 				//playerInfo pInfo;
 				ia >> pInfo;
-
-				std::cout << "ID: " << pInfo.playerId << std::endl;
-				std::cout << "mouseX: " << pInfo.mouseX << std::endl;
-				std::cout << "mouseY: " << pInfo.mouseY << std::endl << std::endl;
+				CopyPlayerInfo(pInfoPtr, &pInfo);
+				std::cout << "[recv]ID: " << pInfoPtr->playerId << std::endl;
+				std::cout << "[recv]mouseX: " << pInfoPtr->mouseX << std::endl;
+				std::cout << "[recv]mouseY: " << pInfoPtr->mouseY << std::endl << std::endl;
 			}
-			
 		}
+		return pInfoPtr;
 	}
-	else if (iResult == 0)
-		printf("Connection closed\n");
 	else
+	{
 		printf("recv failed with error: %d\n", WSAGetLastError());
+		return NULL;
+	}
 
-	return iResult;
+	return NULL;
 }
 
-int socketManager::sendMessage(SOCKET ClientSocket)
+int socketManager::sendMessage(SOCKET clientSocket, playerInfo* pInfoPtr)
 {
 	int iSendResult;
 	memset(sendBuffer, 0, sizeof(sendBuffer));
@@ -226,24 +290,26 @@ int socketManager::sendMessage(SOCKET ClientSocket)
 		tempInt[i] = pInfo.keyInput[i];*/
 	//playerInfo T(0, count, 0, pInfo.mouseInput, pInfo.keyInput);
 
-
+	playerInfo pInfo;
+	CopyPlayerInfo(&pInfo, pInfoPtr);
+	
 	boost::archive::text_oarchive oa(os);
 	oa << pInfo;//T;
 	sendBuffer[strlen(sendBuffer)] = '\n';
 
 	std::string msgLen = std::to_string(strlen(sendBuffer));
 	const char* msgLenChar = msgLen.c_str();
-	iSendResult = send(ClientSocket, msgLenChar, sizeof(int), 0);
+	iSendResult = send(clientSocket, msgLenChar, sizeof(int), 0);
 	if (iSendResult == SOCKET_ERROR) {
 		printf("send failed with error: %d\n", WSAGetLastError());
-		//closesocket(ClientSocket);
+		//closesocket(clientSocket);
 		//WSACleanup();
 		return -1;
 	}
-	iSendResult = send(ClientSocket, sendBuffer, strlen(sendBuffer), 0);
+	iSendResult = send(clientSocket, sendBuffer, strlen(sendBuffer), 0);
 	if (iSendResult == SOCKET_ERROR) {
 		printf("send failed with error: %d\n", WSAGetLastError());
-		//closesocket(ClientSocket);
+		//closesocket(clientSocket);
 		//WSACleanup();
 		return -1;
 	}
@@ -254,4 +320,13 @@ int socketManager::sendMessage(SOCKET ClientSocket)
 	return iSendResult;
 }
 
-
+void socketManager::CopyPlayerInfo(playerInfo* dest, playerInfo* src)
+{
+	for (int i = 0; i < sizeof(src->keyInput) / sizeof(int); i++)
+		dest->keyInput[i] = src->keyInput[i];
+	for (int i = 0; i < sizeof(src->mouseInput); i++)
+		dest->mouseInput[i] = src->mouseInput[i];
+	dest->mouseX = src->mouseX;
+	dest->mouseY = src->mouseY;
+	dest->playerId = src->playerId;
+}

@@ -2,6 +2,10 @@
 #ifndef _SOCKETMANAGER_H_
 #define _SOCKETMANAGER_H_
 
+#include <mutex>
+#include <thread>
+#include <queue>
+
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/iostreams/device/array.hpp>
@@ -15,8 +19,9 @@ using namespace boost::iostreams;
 #include <winsock2.h>
 #include <windows.h>
 #include <ws2tcpip.h>
-
 #pragma comment (lib, "Ws2_32.lib")
+
+
 
 class playerInfo
 {
@@ -66,23 +71,28 @@ public:
 	void Frame();
 	void Shutdown();
 
-	bool CheckNewConnection();
-
+	bool CheckNewConnection(int);
+	void ListenToClients(int);
 	void PushToClients();
 
-	int receiveMessage(SOCKET ConnectSocket);
-	int sendMessage(SOCKET ConnectSocket);
+	playerInfo* receiveMessage(SOCKET ConnectSocket);
+	int sendMessage(SOCKET ConnectSocket, playerInfo*);
 private:
 	void CloseClientSockets(std::vector<int>);
+	void CopyPlayerInfo(playerInfo*, playerInfo*);
 
 
 	char sendBuffer[BUFFER_SIZE];
 	char recvBuffer[BUFFER_SIZE];
 	std::vector<int> delimiterIndex;
-	//Last is NULL waiting for new connection
-	std::vector<SOCKET> ClientSocket;
+
+	std::vector<SOCKET> clientSocket;
+	std::vector<std::thread> clientThread;
+	std::vector<std::mutex*> threadLock;
+	std::vector<std::queue<playerInfo*>> clientReadBuffer;
+	std::queue<playerInfo*> clientSendBuffer;
+
 	SOCKET ListenSocket;
-	playerInfo pInfo;
 	int count;
 };
 
