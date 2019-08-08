@@ -113,7 +113,6 @@ int socketManager::Initialize()
 void socketManager::ListenToClients(int clientId)
 {
 	bool flag = true;
-	std::cout << "Client ID: " + std::to_string(clientId) << std::endl;
 	while (flag)
 	{
 		playerInfo* tempMsg = receiveMessage(clientSocket[clientId]);
@@ -125,12 +124,11 @@ void socketManager::ListenToClients(int clientId)
 		else
 		{
 			threadLock[clientId]->lock();
-			std::cout << "Before ReadBufferSize: " + std::to_string(clientReadBuffer.size()) << std::endl;
 			std::cout << "[thread]ID: " << tempMsg->playerId << std::endl;
 			std::cout << "[thread]mouseX: " << tempMsg->mouseX << std::endl;
-			std::cout << "[thread]mouseY: " << tempMsg->mouseY << std::endl << std::endl;
+			std::cout << "[thread]mouseY: " << tempMsg->mouseY << std::endl;
+			std::cout << "[thread]playerPos x:" << tempMsg->playerPos[0] << std::endl << std::endl;
 			clientReadBuffer[clientId].push(tempMsg);
-			std::cout << "After ReadBufferSize: " + std::to_string(clientReadBuffer.size()) << std::endl;
 			threadLock[clientId]->unlock();
 		}
 	}
@@ -282,19 +280,11 @@ int socketManager::sendMessage(SOCKET clientSocket, playerInfo* pInfoPtr)
 	array_sink sink{ sendBuffer };
 	stream<array_sink> os{ sink };
 
-	/*bool tempBool[3];
-	for (int i = 0; i < 3; i++)
-		tempBool[i] = pInfo.mouseInput[i];
-	int tempInt[10];
-	for (int i = 0; i < 10; i++)
-		tempInt[i] = pInfo.keyInput[i];*/
-	//playerInfo T(0, count, 0, pInfo.mouseInput, pInfo.keyInput);
-
 	playerInfo pInfo;
 	CopyPlayerInfo(&pInfo, pInfoPtr);
 	
 	boost::archive::text_oarchive oa(os);
-	oa << pInfo;//T;
+	oa << pInfo;
 	sendBuffer[strlen(sendBuffer)] = '\n';
 
 	std::string msgLen = std::to_string(strlen(sendBuffer));
@@ -309,13 +299,8 @@ int socketManager::sendMessage(SOCKET clientSocket, playerInfo* pInfoPtr)
 	iSendResult = send(clientSocket, sendBuffer, strlen(sendBuffer), 0);
 	if (iSendResult == SOCKET_ERROR) {
 		printf("send failed with error: %d\n", WSAGetLastError());
-		//closesocket(clientSocket);
-		//WSACleanup();
 		return -1;
 	}
-
-	//std::cout << sendBuffer << std::endl;
-	//printf("Bytes sent: %d\n", iSendResult);
 
 	return iSendResult;
 }
@@ -326,7 +311,11 @@ void socketManager::CopyPlayerInfo(playerInfo* dest, playerInfo* src)
 		dest->keyInput[i] = src->keyInput[i];
 	for (int i = 0; i < sizeof(src->mouseInput); i++)
 		dest->mouseInput[i] = src->mouseInput[i];
+	for (int i = 0; i < 3; i++)
+		dest->playerPos[i] = src->playerPos[i];
 	dest->mouseX = src->mouseX;
 	dest->mouseY = src->mouseY;
 	dest->playerId = src->playerId;
+	dest->bossHitCount = src->bossHitCount;
+	dest->playerHitCount = src->playerHitCount;
 }

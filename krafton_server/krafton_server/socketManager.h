@@ -45,19 +45,28 @@ public:
 
 	}
 	int playerId;
-	int mouseX;
-	int mouseY;
+	int playerPos[3];
 
+	int mouseX, mouseY;
 	bool mouseInput[3];
 	int keyInput[10];
+
+	int bossHitCount;
+	int playerHitCount;
 
 	template<class Archive>
 	void serialize(Archive& ar, const unsigned int version) {
 		ar& playerId;
+
+		ar& playerPos;
+
 		ar& mouseX;
 		ar& mouseY;
 		ar& mouseInput;
 		ar& keyInput;
+
+		ar& bossHitCount;
+		ar& playerHitCount;
 	}
 };
 
