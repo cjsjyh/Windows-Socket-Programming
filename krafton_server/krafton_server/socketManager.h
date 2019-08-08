@@ -71,9 +71,23 @@ public:
 };
 
 
+class MsgBundle
+{
+public:
+	int type;
+	void* ptr;
+};
+
 class socketManager
 {
 public:
+	enum DataType
+	{
+		PLAYER_INFO,
+		BOSS_INFO,
+		ITEM_INFO,
+	};
+
 	socketManager();
 	~socketManager();
 	int Initialize();
@@ -84,8 +98,8 @@ public:
 	void ListenToClients(int);
 	void PushToClients();
 
-	playerInfo* receiveMessage(SOCKET ConnectSocket);
-	int sendMessage(SOCKET ConnectSocket, playerInfo*);
+	MsgBundle* receiveMessage(SOCKET ConnectSocket);
+	int sendMessage(SOCKET ConnectSocket, MsgBundle*);
 private:
 	void CloseClientSockets(std::vector<int>);
 	void CopyPlayerInfo(playerInfo*, playerInfo*);
@@ -98,8 +112,9 @@ private:
 	std::vector<SOCKET> clientSocket;
 	std::vector<std::thread> clientThread;
 	std::vector<std::mutex*> threadLock;
-	std::vector<std::queue<playerInfo*>> clientReadBuffer;
-	std::queue<playerInfo*> clientSendBuffer;
+
+	std::vector<std::queue<MsgBundle*>> clientReadBuffer;
+	std::queue<MsgBundle*> clientSendBuffer;
 
 	SOCKET ListenSocket;
 	int count;
