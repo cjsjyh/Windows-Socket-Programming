@@ -101,6 +101,7 @@ int socketManager::Initialize()
 			--i;
 
 	//Set initial HP parameters
+	
 	/*
 	MsgBundle* tempMsgHp = new MsgBundle;
 	hpInfo* tempHp = new hpInfo;
@@ -109,8 +110,8 @@ int socketManager::Initialize()
 		tempHp->playerHp[i] = dataCenter::playerHp[i];
 	tempMsgHp->type = HP_INFO;
 	tempMsgHp->ptr = tempHp;
-	clientSendBuffer.push(tempMsgHp);
-	*/
+	clientSendBuffer.push(tempMsgHp);*/
+
 	MsgBundle* tempMsgParam = new MsgBundle;
 	InitialParamBundle* tempParam = new InitialParamBundle(dataCenter::playerMaxHp, 
 															dataCenter::bossMaxHp, 
