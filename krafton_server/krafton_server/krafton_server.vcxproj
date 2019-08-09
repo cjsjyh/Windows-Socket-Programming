@@ -134,12 +134,14 @@
     <ClCompile Include="dataCenter.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="socketManager.cpp" />
+    <ClCompile Include="textReader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="applicationClass.h" />
     <ClInclude Include="dataCenter.h" />
     <ClInclude Include="socketManager.h" />
     <ClInclude Include="main.h" />
+    <ClInclude Include="textReader.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

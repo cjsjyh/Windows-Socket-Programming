@@ -101,19 +101,25 @@ int socketManager::Initialize()
 			--i;
 
 	//Set initial HP parameters
-	MsgBundle* tempMsg = new MsgBundle;
+	/*
+	MsgBundle* tempMsgHp = new MsgBundle;
 	hpInfo* tempHp = new hpInfo;
-
 	tempHp->bossHp = dataCenter::bossHp;
 	for (int i = 0; i < 2; i++)
 		tempHp->playerHp[i] = dataCenter::playerHp[i];
-	tempHp->bossMaxHp = dataCenter::bossMaxHp;
-	tempHp->playerMaxHp = dataCenter::playerMaxHp;
-
-	tempMsg->type = HP_INFO;
-	tempMsg->ptr = tempHp;
-	clientSendBuffer.push(tempMsg);
-
+	tempMsgHp->type = HP_INFO;
+	tempMsgHp->ptr = tempHp;
+	clientSendBuffer.push(tempMsgHp);
+	*/
+	MsgBundle* tempMsgParam = new MsgBundle;
+	InitialParamBundle* tempParam = new InitialParamBundle(dataCenter::playerMaxHp, 
+															dataCenter::bossMaxHp, 
+															dataCenter::bossPhase2Hp, 
+															dataCenter::bossPhase3Hp);
+	tempMsgParam->type = PARAM_INFO;
+	tempMsgParam->ptr = tempParam;
+	clientSendBuffer.push(tempMsgParam);
+	
 	PushToClients();
 
 	//Make new thread for each Client
@@ -306,6 +312,7 @@ MsgBundle* socketManager::receiveMessage(SOCKET ConnectSocket)
 		
 		playerInput pInfo;
 		hpInfo hInfo;
+		InitialParamBundle paramInfo;
 		switch (msgType)
 		{
 		case PLAYER_INFO:
@@ -331,6 +338,14 @@ MsgBundle* socketManager::receiveMessage(SOCKET ConnectSocket)
 			CopyHpInfo(hInfoPtr, &hInfo);
 			msgBundle->ptr = hInfoPtr;
 			break;
+		case PARAM_INFO:
+			ia >> paramInfo;
+			InitialParamBundle* paramInfoPtr;
+			paramInfoPtr = new InitialParamBundle;
+			CopyInitialParamBundle(paramInfoPtr, &paramInfo);
+
+			msgBundle->ptr = paramInfoPtr;
+			break;
 		}
 		msgBundle->type = msgType;
 	
@@ -352,6 +367,7 @@ int socketManager::sendMessage(SOCKET ClientSocket, MsgBundle* msgBundle)
 
 	playerInput pinput;
 	hpInfo hInfo;
+	InitialParamBundle paramInfo;
 	switch (msgBundle->type)
 	{
 	case PLAYER_INFO:
@@ -367,6 +383,10 @@ int socketManager::sendMessage(SOCKET ClientSocket, MsgBundle* msgBundle)
 	case HP_INFO:
 		CopyHpInfo(&hInfo, (hpInfo*)(msgBundle->ptr));
 		oa << hInfo;
+		break;
+	case PARAM_INFO:
+		CopyInitialParamBundle(&paramInfo, (InitialParamBundle*)(msgBundle->ptr));
+		oa << paramInfo;
 		break;
 	}
 
@@ -425,6 +445,12 @@ void socketManager::CopyHpInfo(hpInfo* dest, hpInfo* src)
 	dest->playerHitCount = src->playerHitCount;
 	for (int i = 0; i < sizeof(src->playerHp) / sizeof(int); i++)
 		dest->playerHp[i] = src->playerHp[i];
+}
+
+void socketManager::CopyInitialParamBundle(InitialParamBundle* dest, InitialParamBundle* src)
+{
 	dest->bossMaxHp = src->bossMaxHp;
+	dest->bossPhase2Hp = src->bossPhase2Hp;
+	dest->bossPhase3Hp = src->bossPhase3Hp;
 	dest->playerMaxHp = src->playerMaxHp;
 }

@@ -73,15 +73,11 @@ public:
 		for (int i = 0; i < sizeof(playerHp) / sizeof(int); i++)
 			playerHp[i] = -1;
 		bossHp = -1;
-		playerMaxHp = -1;
-		bossMaxHp = -1;
 	}
 
 	hpInfo(int _bossHp, int* _playerHp)
 	{
 		playerId = -1;
-		playerMaxHp = -1;
-		bossMaxHp = -1;
 		bossHitCount = -1;
 		playerHitCount = -1;
 		bossHp = _bossHp;
@@ -94,9 +90,7 @@ public:
 	int bossHp;
 	int bossHitCount;
 	int playerHitCount;
-
-	int playerMaxHp;
-	int bossMaxHp;
+	
 
 	template<class Archive>
 	void serialize(Archive& ar, const unsigned int version) {
@@ -105,8 +99,43 @@ public:
 		ar& bossHp;
 		ar& bossHitCount;
 		ar& playerHitCount;
+	}
+};
+
+class InitialParamBundle {
+public:
+	friend class boost::serialization::access;
+
+	InitialParamBundle()
+	{
+		playerMaxHp = -1;
+		bossMaxHp = -1;
+		bossPhase2Hp = -1;
+		bossPhase3Hp = -1;
+	}
+
+	InitialParamBundle(int _pMaxHp, int _bMaxHp, int _b2Hp, int _b3Hp) {
+		playerMaxHp = _pMaxHp;
+		bossMaxHp = _bMaxHp;
+		bossPhase2Hp = _b2Hp;
+		bossPhase3Hp = _b3Hp;
+	}
+
+	~InitialParamBundle() {
+
+	}
+
+	int playerMaxHp;
+	int bossMaxHp;
+	int bossPhase2Hp;
+	int bossPhase3Hp;
+
+	template<class Archive>
+	void serialize(Archive& ar, const unsigned int version) {
 		ar& playerMaxHp;
 		ar& bossMaxHp;
+		ar& bossPhase2Hp;
+		ar& bossPhase3Hp;
 	}
 };
 
@@ -126,6 +155,7 @@ public:
 		BOSS_INFO,
 		HP_INFO,
 		ITEM_INFO,
+		PARAM_INFO
 	};
 
 	socketManager();
@@ -144,6 +174,7 @@ private:
 	void CloseClientSockets(std::vector<int>);
 	void CopyPlayerInfo(playerInput*, playerInput*);
 	void CopyHpInfo(hpInfo*, hpInfo*);
+	void CopyInitialParamBundle(InitialParamBundle*, InitialParamBundle*);
 
 	char sendBuffer[BUFFER_SIZE];
 	char recvBuffer[BUFFER_SIZE];

@@ -8,9 +8,10 @@ public:
 	static int bossHp;
 	static int playerHp[2];
 
-	static int bossMaxHp;
 	static int playerMaxHp;
-
+	static int bossMaxHp;
+	static int bossPhase2Hp;
+	static int bossPhase3Hp;
 };
 
 #endif
