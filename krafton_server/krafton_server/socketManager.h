@@ -71,8 +71,12 @@ public:
 		bossHitCount = -1;
 		playerHitCount = -1;
 		for (int i = 0; i < sizeof(playerHp) / sizeof(int); i++)
+		{
 			playerHp[i] = -1;
+			playerHeal[i] = 0;
+		}
 		bossHp = -1;
+		bossHeal = 0;
 	}
 
 	hpInfo(int _bossHp, int* _playerHp)
@@ -82,15 +86,21 @@ public:
 		playerHitCount = -1;
 		bossHp = _bossHp;
 		for (int i = 0; i < 2; i++)
+		{
 			playerHp[i] = _playerHp[i];
+			playerHeal[i] = 0;
+		}
+		bossHeal = 0;
 	}
 
 	int playerId;
 	int playerHp[2];
+	int playerHitCount;
+	int playerHeal[2];
+
 	int bossHp;
 	int bossHitCount;
-	int playerHitCount;
-	
+	int bossHeal;
 
 	template<class Archive>
 	void serialize(Archive& ar, const unsigned int version) {
@@ -99,6 +109,31 @@ public:
 		ar& bossHp;
 		ar& bossHitCount;
 		ar& playerHitCount;
+		ar& playerHeal;
+		ar& bossHeal;
+	}
+};
+
+class ItemInfo {
+public:
+	friend class boost::serialization::access;
+
+	ItemInfo() {
+		playerId = -1;
+		itemId;
+	}
+
+	~ItemInfo() {
+
+	}
+
+	int playerId;
+	int itemId;
+
+	template<class Archive>
+	void serialize(Archive& ar, const unsigned int version) {
+		ar& playerId;
+		ar& itemId;
 	}
 };
 
@@ -158,6 +193,15 @@ public:
 		PARAM_INFO
 	};
 
+	enum ItemType
+	{
+		ACTIVE_SHOTGUN,
+		ACTIVE_SNIPER,
+		ACTIVE_BASIC,
+		PASSIVE_RANGE,
+		PASSIVE_TIME,
+	};
+
 	socketManager();
 	~socketManager();
 	int Initialize();
@@ -172,10 +216,15 @@ public:
 	int sendMessage(SOCKET ConnectSocket, MsgBundle*);
 private:
 	void CloseClientSockets(std::vector<int>);
+
 	void CopyPlayerInfo(playerInput*, playerInput*);
 	void CopyHpInfo(hpInfo*, hpInfo*);
 	void CopyInitialParamBundle(InitialParamBundle*, InitialParamBundle*);
+	void CopyItemInfo(ItemInfo*, ItemInfo*);
 
+	void HandleHpInfo(hpInfo*);
+
+private:
 	char sendBuffer[BUFFER_SIZE];
 	char recvBuffer[BUFFER_SIZE];
 	std::vector<int> delimiterIndex;

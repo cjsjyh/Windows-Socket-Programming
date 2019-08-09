@@ -101,17 +101,6 @@ int socketManager::Initialize()
 			--i;
 
 	//Set initial HP parameters
-	
-	/*
-	MsgBundle* tempMsgHp = new MsgBundle;
-	hpInfo* tempHp = new hpInfo;
-	tempHp->bossHp = dataCenter::bossHp;
-	for (int i = 0; i < 2; i++)
-		tempHp->playerHp[i] = dataCenter::playerHp[i];
-	tempMsgHp->type = HP_INFO;
-	tempMsgHp->ptr = tempHp;
-	clientSendBuffer.push(tempMsgHp);*/
-
 	MsgBundle* tempMsgParam = new MsgBundle;
 	InitialParamBundle* tempParam = new InitialParamBundle(dataCenter::playerMaxHp, 
 															dataCenter::bossMaxHp, 
@@ -120,7 +109,6 @@ int socketManager::Initialize()
 	tempMsgParam->type = PARAM_INFO;
 	tempMsgParam->ptr = tempParam;
 	clientSendBuffer.push(tempMsgParam);
-	
 	PushToClients();
 
 	//Make new thread for each Client
@@ -149,10 +137,13 @@ void socketManager::ListenToClients(int clientId)
 		else
 		{
 			threadLock[clientId]->lock();
+			std::cout << recvBuffer << std::endl;
+			/*
 			std::cout << "[thread]ID: " << ((playerInput*)(tempMsg->ptr))->playerId << std::endl;
 			std::cout << "[thread]mouseX: " << ((playerInput*)(tempMsg->ptr))->mouseX << std::endl;
 			std::cout << "[thread]mouseY: " << ((playerInput*)(tempMsg->ptr))->mouseY << std::endl;
 			std::cout << "[thread]playerPos x:" << ((playerInput*)(tempMsg->ptr))->playerPos[0] << std::endl << std::endl;
+			*/
 			clientReadBuffer[clientId].push(tempMsg);
 			threadLock[clientId]->unlock();
 		}
@@ -232,26 +223,15 @@ void socketManager::Frame()
 				case PLAYER_INFO:
 					clientSendBuffer.push(tempMsg);
 					break;
+
 				case BOSS_INFO:
 					
 					break;
+
 				case HP_INFO:
 					hpInfo* tempHp;
 					tempHp = (hpInfo*)(tempMsg->ptr);
-					if (tempHp->playerHitCount > 0)
-					{
-						--dataCenter::playerHp[0];
-						--dataCenter::playerHp[1];
-					}
-					if(tempHp->bossHitCount >0)
-					{
-						--dataCenter::bossHp;
-					}
-					tempHp->playerHp[0] = dataCenter::playerHp[0];
-					tempHp->playerHp[1] = dataCenter::playerHp[1];
-					tempHp->bossHp = dataCenter::bossHp;
-					printf("Player: %d %d Boss: %d\n",tempHp->playerHp[0],tempHp->playerHp[1],tempHp->bossHp);
-
+					HandleHpInfo(tempHp);
 					clientSendBuffer.push(tempMsg);
 					break;
 				}
@@ -334,6 +314,7 @@ MsgBundle* socketManager::receiveMessage(SOCKET ConnectSocket)
 
 		case HP_INFO:
 			ia >> hInfo;
+			printf("Heal: %d | %d\n",hInfo.playerHeal[0],hInfo.playerHeal[1]);
 			hpInfo* hInfoPtr;
 			hInfoPtr = new hpInfo();
 			CopyHpInfo(hInfoPtr, &hInfo);
@@ -426,6 +407,30 @@ int socketManager::sendMessage(SOCKET ClientSocket, MsgBundle* msgBundle)
 }
 
 
+void socketManager::HandleHpInfo(hpInfo* tempHp)
+{
+	//Damage
+	if (tempHp->playerHitCount > 0)
+	{
+		--dataCenter::playerHp[tempHp->playerId];
+		dataCenter::playerHp[1] = 0;
+	}
+	if (tempHp->bossHitCount > 0)
+	{
+		--dataCenter::bossHp;
+	}
+
+	//Heal
+	for (int i = 0; i < 2; i++)
+		dataCenter::playerHp[i] += tempHp->playerHeal[i];
+	dataCenter::bossHp += tempHp->bossHeal;
+
+
+	tempHp->playerHp[0] = dataCenter::playerHp[0];
+	tempHp->playerHp[1] = dataCenter::playerHp[1];
+	tempHp->bossHp = dataCenter::bossHp;
+}
+
 void socketManager::CopyPlayerInfo(playerInput* dest, playerInput* src)
 {
 	for (int i = 0; i < sizeof(src->keyInput) / sizeof(int); i++)
@@ -445,7 +450,12 @@ void socketManager::CopyHpInfo(hpInfo* dest, hpInfo* src)
 	dest->bossHp = src->bossHp;
 	dest->playerHitCount = src->playerHitCount;
 	for (int i = 0; i < sizeof(src->playerHp) / sizeof(int); i++)
+	{
 		dest->playerHp[i] = src->playerHp[i];
+		dest->playerHeal[i] = src->playerHeal[i];
+	}
+	dest->bossHeal = src->bossHeal;
+	printf("Source Heal: %d Dest Heal: %d\n",src->playerHeal[1],dest->playerHeal[0]);
 }
 
 void socketManager::CopyInitialParamBundle(InitialParamBundle* dest, InitialParamBundle* src)
@@ -454,4 +464,10 @@ void socketManager::CopyInitialParamBundle(InitialParamBundle* dest, InitialPara
 	dest->bossPhase2Hp = src->bossPhase2Hp;
 	dest->bossPhase3Hp = src->bossPhase3Hp;
 	dest->playerMaxHp = src->playerMaxHp;
+}
+
+void socketManager::CopyItemInfo(ItemInfo* dest, ItemInfo* src)
+{
+	dest->itemId = src->itemId;
+	dest->playerId = src->itemId;
 }

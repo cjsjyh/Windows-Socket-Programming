@@ -1,9 +1,11 @@
 #include "dataCenter.h"
 
-int dataCenter::bossHp = 10;
-int dataCenter::playerHp[2] = { 10, };
+int dataCenter::playerMaxHp = -1;
+int dataCenter::playerHp[2] = { -1, };
+int dataCenter::playerAttackType[2] = { -1, };
+int dataCenter::playerPassiveType[2] = { -1, };
 
-int dataCenter::playerMaxHp = 10;
-int dataCenter::bossMaxHp = 10;
-int dataCenter::bossPhase2Hp = 7;
-int dataCenter::bossPhase3Hp = 3;
+int dataCenter::bossMaxHp = -1;
+int dataCenter::bossHp = -1;
+int dataCenter::bossPhase2Hp = -1;
+int dataCenter::bossPhase3Hp = -1;

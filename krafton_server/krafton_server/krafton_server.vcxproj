@@ -134,6 +134,7 @@
     <ClCompile Include="dataCenter.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="socketManager.cpp" />
+    <ClCompile Include="stdafx.cpp" />
     <ClCompile Include="textReader.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -141,6 +142,7 @@
     <ClInclude Include="dataCenter.h" />
     <ClInclude Include="socketManager.h" />
     <ClInclude Include="main.h" />
+    <ClInclude Include="stdafx.h" />
     <ClInclude Include="textReader.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
