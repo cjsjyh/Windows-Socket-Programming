@@ -6,6 +6,8 @@
 #include <sstream>
 #include <vector>
 
+#include "dataCenter.h"
+
 #include <string>
 
 
@@ -98,6 +100,22 @@ int socketManager::Initialize()
 		if (!CheckNewConnection(i))
 			--i;
 
+	//Set initial HP parameters
+	MsgBundle* tempMsg = new MsgBundle;
+	hpInfo* tempHp = new hpInfo;
+
+	tempHp->bossHp = dataCenter::bossHp;
+	for (int i = 0; i < 2; i++)
+		tempHp->playerHp[i] = dataCenter::playerHp[i];
+	tempHp->bossMaxHp = dataCenter::bossMaxHp;
+	tempHp->playerMaxHp = dataCenter::playerMaxHp;
+
+	tempMsg->type = HP_INFO;
+	tempMsg->ptr = tempHp;
+	clientSendBuffer.push(tempMsg);
+
+	PushToClients();
+
 	//Make new thread for each Client
 	for (int i = 0; i < CLIENT_COUNT; i++)
 		clientThread.push_back(std::thread([&,i]() {ListenToClients(i);}));
@@ -124,10 +142,10 @@ void socketManager::ListenToClients(int clientId)
 		else
 		{
 			threadLock[clientId]->lock();
-			std::cout << "[thread]ID: " << ((playerInfo*)tempMsg)->playerId << std::endl;
-			std::cout << "[thread]mouseX: " << ((playerInfo*)tempMsg)->mouseX << std::endl;
-			std::cout << "[thread]mouseY: " << ((playerInfo*)tempMsg)->mouseY << std::endl;
-			std::cout << "[thread]playerPos x:" << ((playerInfo*)tempMsg)->playerPos[0] << std::endl << std::endl;
+			std::cout << "[thread]ID: " << ((playerInput*)(tempMsg->ptr))->playerId << std::endl;
+			std::cout << "[thread]mouseX: " << ((playerInput*)(tempMsg->ptr))->mouseX << std::endl;
+			std::cout << "[thread]mouseY: " << ((playerInput*)(tempMsg->ptr))->mouseY << std::endl;
+			std::cout << "[thread]playerPos x:" << ((playerInput*)(tempMsg->ptr))->playerPos[0] << std::endl << std::endl;
 			clientReadBuffer[clientId].push(tempMsg);
 			threadLock[clientId]->unlock();
 		}
@@ -198,8 +216,40 @@ void socketManager::Frame()
 			threadLock[i]->lock();
 			while (clientReadBuffer[i].size() != 0)
 			{
-				clientSendBuffer.push((clientReadBuffer[i].front()));
+				MsgBundle* tempMsg;
+				tempMsg = clientReadBuffer[i].front();
+				printf("Handling: ");
+				printf("%d\n", tempMsg->type);
+				switch (tempMsg->type)
+				{
+				case PLAYER_INFO:
+					clientSendBuffer.push(tempMsg);
+					break;
+				case BOSS_INFO:
+					
+					break;
+				case HP_INFO:
+					hpInfo* tempHp;
+					tempHp = (hpInfo*)(tempMsg->ptr);
+					if (tempHp->playerHitCount > 0)
+					{
+						--dataCenter::playerHp[0];
+						--dataCenter::playerHp[1];
+					}
+					if(tempHp->bossHitCount >0)
+					{
+						--dataCenter::bossHp;
+					}
+					tempHp->playerHp[0] = dataCenter::playerHp[0];
+					tempHp->playerHp[1] = dataCenter::playerHp[1];
+					tempHp->bossHp = dataCenter::bossHp;
+					printf("Player: %d %d Boss: %d\n",tempHp->playerHp[0],tempHp->playerHp[1],tempHp->bossHp);
+
+					clientSendBuffer.push(tempMsg);
+					break;
+				}
 				clientReadBuffer[i].pop();
+				printf("done\n");
 			}
 			threadLock[i]->unlock();
 		}
@@ -247,61 +297,42 @@ MsgBundle* socketManager::receiveMessage(SOCKET ConnectSocket)
 	iResult = recv(ConnectSocket, recvBuffer, msgLen, 0);
 	if (iResult > 0)
 	{
-		//FIND \n INDEX
-		/*
-		delimiterIndex.clear();
-		for (int i = 0; i < strlen(recvBuffer); i++)
-			if (recvBuffer[i] == '\n')
-				delimiterIndex.push_back(i);
-		
-
-		//HANDLE EACH MESSAGE BY DELIMITER
-		int prevEnd = -1;
-		
-		for (int i = 0; i < delimiterIndex.size(); i++)
-		{
-			int messageLen = delimiterIndex[i];
-			std::stringstream ss;
-			ss.write(&(recvBuffer[prevEnd + 1]), delimiterIndex[i] - (prevEnd + 1) );
-			boost::archive::text_iarchive ia(ss);
-			prevEnd = delimiterIndex[i] + 1;
-				
-			//playerInfo pInfo;
-			ia >> pInfo;
-			CopyPlayerInfo(pInfoPtr, &pInfo);
-			std::cout << "[recv]ID: " << pInfoPtr->playerId << std::endl;
-			std::cout << "[recv]mouseX: " << pInfoPtr->mouseX << std::endl;
-			std::cout << "[recv]mouseY: " << pInfoPtr->mouseY << std::endl << std::endl;
-		}
-		*/
 		std::stringstream ss;
 		ss.write(recvBuffer, msgLen);
 		boost::archive::text_iarchive ia(ss);
 
 		MsgBundle* msgBundle = new MsgBundle;
 
-		playerInfo* pInfoPtr = new playerInfo;
-		playerInfo pInfo;
+		
+		playerInput pInfo;
+		hpInfo hInfo;
 		switch (msgType)
 		{
 		case PLAYER_INFO:
 			ia >> pInfo;
+			playerInput* pInfoPtr;
+			pInfoPtr = new playerInput;
 			CopyPlayerInfo(pInfoPtr, &pInfo);
-			
 			msgBundle->ptr = pInfoPtr;
-			msgBundle->type = msgType;
-			
-			std::cout << "[recv]ID: " << pInfoPtr->playerId << std::endl;
-			std::cout << "[recv]mouseX: " << pInfoPtr->mouseX << std::endl;
-			std::cout << "[recv]mouseY: " << pInfoPtr->mouseY << std::endl << std::endl;
 			break;
+
 		case BOSS_INFO:
 
 			break;
+
 		case ITEM_INFO:
 
 			break;
+
+		case HP_INFO:
+			ia >> hInfo;
+			hpInfo* hInfoPtr;
+			hInfoPtr = new hpInfo();
+			CopyHpInfo(hInfoPtr, &hInfo);
+			msgBundle->ptr = hInfoPtr;
+			break;
 		}
+		msgBundle->type = msgType;
 	
 		return msgBundle;
 	}
@@ -319,18 +350,23 @@ int socketManager::sendMessage(SOCKET ClientSocket, MsgBundle* msgBundle)
 	stream<array_sink> os{ sink };
 	boost::archive::text_oarchive oa(os);
 
-	playerInfo input;
+	playerInput pinput;
+	hpInfo hInfo;
 	switch (msgBundle->type)
 	{
 	case PLAYER_INFO:
-		CopyPlayerInfo(&input, (playerInfo*)(msgBundle->ptr));
-		oa << input;
+		CopyPlayerInfo(&pinput, (playerInput*)(msgBundle->ptr));
+		oa << pinput;
 		break;
 	case BOSS_INFO:
 
 		break;
 	case ITEM_INFO:
 
+		break;
+	case HP_INFO:
+		CopyHpInfo(&hInfo, (hpInfo*)(msgBundle->ptr));
+		oa << hInfo;
 		break;
 	}
 
@@ -368,41 +404,8 @@ int socketManager::sendMessage(SOCKET ClientSocket, MsgBundle* msgBundle)
 	return iSendResult;
 }
 
-//
-//int socketManager::sendMessage(SOCKET clientSocket, playerInfo* pInfoPtr)
-//{
-//	int iSendResult;
-//	memset(sendBuffer, 0, sizeof(sendBuffer));
-//
-//	array_sink sink{ sendBuffer };
-//	stream<array_sink> os{ sink };
-//
-//	playerInfo pInfo;
-//	CopyPlayerInfo(&pInfo, pInfoPtr);
-//	
-//	boost::archive::text_oarchive oa(os);
-//	oa << pInfo;
-//	sendBuffer[strlen(sendBuffer)] = '\n';
-//
-//	std::string msgLen = std::to_string(strlen(sendBuffer));
-//	const char* msgLenChar = msgLen.c_str();
-//	iSendResult = send(clientSocket, msgLenChar, sizeof(int), 0);
-//	if (iSendResult == SOCKET_ERROR) {
-//		printf("send failed with error: %d\n", WSAGetLastError());
-//		//closesocket(clientSocket);
-//		//WSACleanup();
-//		return -1;
-//	}
-//	iSendResult = send(clientSocket, sendBuffer, strlen(sendBuffer), 0);
-//	if (iSendResult == SOCKET_ERROR) {
-//		printf("send failed with error: %d\n", WSAGetLastError());
-//		return -1;
-//	}
-//
-//	return iSendResult;
-//}
 
-void socketManager::CopyPlayerInfo(playerInfo* dest, playerInfo* src)
+void socketManager::CopyPlayerInfo(playerInput* dest, playerInput* src)
 {
 	for (int i = 0; i < sizeof(src->keyInput) / sizeof(int); i++)
 		dest->keyInput[i] = src->keyInput[i];
@@ -413,6 +416,15 @@ void socketManager::CopyPlayerInfo(playerInfo* dest, playerInfo* src)
 	dest->mouseX = src->mouseX;
 	dest->mouseY = src->mouseY;
 	dest->playerId = src->playerId;
+}
+
+void socketManager::CopyHpInfo(hpInfo* dest, hpInfo* src)
+{
 	dest->bossHitCount = src->bossHitCount;
+	dest->bossHp = src->bossHp;
 	dest->playerHitCount = src->playerHitCount;
+	for (int i = 0; i < sizeof(src->playerHp) / sizeof(int); i++)
+		dest->playerHp[i] = src->playerHp[i];
+	dest->bossMaxHp = src->bossMaxHp;
+	dest->playerMaxHp = src->playerMaxHp;
 }

@@ -131,11 +131,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="applicationClass.cpp" />
+    <ClCompile Include="dataCenter.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="socketManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="applicationClass.h" />
+    <ClInclude Include="dataCenter.h" />
     <ClInclude Include="socketManager.h" />
     <ClInclude Include="main.h" />
   </ItemGroup>

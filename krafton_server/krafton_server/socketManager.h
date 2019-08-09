@@ -23,13 +23,13 @@ using namespace boost::iostreams;
 
 
 
-class playerInfo
+class playerInput
 {
 
 public:
 	friend class boost::serialization::access;
 
-	playerInfo(int _playerId, int _mouseX, int _mouseY, bool* _mouseInput, int* _keyInput)
+	playerInput(int _playerId, int _mouseX, int _mouseY, bool* _mouseInput, int* _keyInput)
 		:playerId(_playerId), mouseX(_mouseX), mouseY(_mouseY)
 	{
 		for (int i = 0; i < sizeof(_mouseInput); i++)
@@ -38,10 +38,10 @@ public:
 			keyInput[i] = _keyInput[i];
 	}
 
-	playerInfo() {
+	playerInput() {
 	}
 
-	~playerInfo() {
+	~playerInput() {
 
 	}
 	int playerId;
@@ -51,25 +51,64 @@ public:
 	bool mouseInput[3];
 	int keyInput[10];
 
-	int bossHitCount;
-	int playerHitCount;
-
 	template<class Archive>
 	void serialize(Archive& ar, const unsigned int version) {
 		ar& playerId;
-
 		ar& playerPos;
 
 		ar& mouseX;
 		ar& mouseY;
 		ar& mouseInput;
 		ar& keyInput;
-
-		ar& bossHitCount;
-		ar& playerHitCount;
 	}
 };
 
+class hpInfo {
+public:
+	friend class boost::serialization::access;
+	hpInfo() {
+		playerId = -1;
+		bossHitCount = -1;
+		playerHitCount = -1;
+		for (int i = 0; i < sizeof(playerHp) / sizeof(int); i++)
+			playerHp[i] = -1;
+		bossHp = -1;
+		playerMaxHp = -1;
+		bossMaxHp = -1;
+	}
+
+	hpInfo(int _bossHp, int* _playerHp)
+	{
+		playerId = -1;
+		playerMaxHp = -1;
+		bossMaxHp = -1;
+		bossHitCount = -1;
+		playerHitCount = -1;
+		bossHp = _bossHp;
+		for (int i = 0; i < 2; i++)
+			playerHp[i] = _playerHp[i];
+	}
+
+	int playerId;
+	int playerHp[2];
+	int bossHp;
+	int bossHitCount;
+	int playerHitCount;
+
+	int playerMaxHp;
+	int bossMaxHp;
+
+	template<class Archive>
+	void serialize(Archive& ar, const unsigned int version) {
+		ar& playerId;
+		ar& playerHp;
+		ar& bossHp;
+		ar& bossHitCount;
+		ar& playerHitCount;
+		ar& playerMaxHp;
+		ar& bossMaxHp;
+	}
+};
 
 class MsgBundle
 {
@@ -85,6 +124,7 @@ public:
 	{
 		PLAYER_INFO,
 		BOSS_INFO,
+		HP_INFO,
 		ITEM_INFO,
 	};
 
@@ -102,8 +142,8 @@ public:
 	int sendMessage(SOCKET ConnectSocket, MsgBundle*);
 private:
 	void CloseClientSockets(std::vector<int>);
-	void CopyPlayerInfo(playerInfo*, playerInfo*);
-
+	void CopyPlayerInfo(playerInput*, playerInput*);
+	void CopyHpInfo(hpInfo*, hpInfo*);
 
 	char sendBuffer[BUFFER_SIZE];
 	char recvBuffer[BUFFER_SIZE];
