@@ -120,7 +120,7 @@ public:
 
 	ItemInfo() {
 		playerId = -1;
-		itemId;
+		itemId = -1;
 	}
 
 	~ItemInfo() {

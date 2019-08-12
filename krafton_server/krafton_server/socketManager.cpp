@@ -314,7 +314,7 @@ MsgBundle* socketManager::receiveMessage(SOCKET ConnectSocket)
 
 		case HP_INFO:
 			ia >> hInfo;
-			printf("Heal: %d | %d\n",hInfo.playerHeal[0],hInfo.playerHeal[1]);
+			//std::cout << "HP: " << recvBuffer << std::endl;
 			hpInfo* hInfoPtr;
 			hInfoPtr = new hpInfo();
 			CopyHpInfo(hInfoPtr, &hInfo);
@@ -412,6 +412,8 @@ void socketManager::HandleHpInfo(hpInfo* tempHp)
 	//Damage
 	if (tempHp->playerHitCount > 0)
 	{
+		//--dataCenter::playerHp[tempHp->playerId];
+		std::cout << "playerId: " + std::to_string(tempHp->playerId) << std::endl;
 		--dataCenter::playerHp[tempHp->playerId];
 		dataCenter::playerHp[1] = 0;
 	}
@@ -446,6 +448,7 @@ void socketManager::CopyPlayerInfo(playerInput* dest, playerInput* src)
 
 void socketManager::CopyHpInfo(hpInfo* dest, hpInfo* src)
 {
+	dest->playerId = src->playerId;
 	dest->bossHitCount = src->bossHitCount;
 	dest->bossHp = src->bossHp;
 	dest->playerHitCount = src->playerHitCount;
