@@ -138,12 +138,12 @@ void socketManager::ListenToClients(int clientId)
 		{
 			threadLock[clientId]->lock();
 			std::cout << recvBuffer << std::endl;
-			/*
-			std::cout << "[thread]ID: " << ((playerInput*)(tempMsg->ptr))->playerId << std::endl;
+			
+			/*std::cout << "[thread]ID: " << ((playerInput*)(tempMsg->ptr))->playerId << std::endl;
 			std::cout << "[thread]mouseX: " << ((playerInput*)(tempMsg->ptr))->mouseX << std::endl;
 			std::cout << "[thread]mouseY: " << ((playerInput*)(tempMsg->ptr))->mouseY << std::endl;
-			std::cout << "[thread]playerPos x:" << ((playerInput*)(tempMsg->ptr))->playerPos[0] << std::endl << std::endl;
-			*/
+			std::cout << "[thread]playerPos x:" << ((playerInput*)(tempMsg->ptr))->playerPos[0] << std::endl << std::endl;*/
+			
 			clientReadBuffer[clientId].push(tempMsg);
 			threadLock[clientId]->unlock();
 		}
@@ -207,7 +207,24 @@ void socketManager::Shutdown()
 
 void socketManager::Frame()
 {
-	for (int i = 0; i < CLIENT_COUNT; i++)
+	count++;
+
+	if (count % 600 == 0)
+	{
+		//SEND BOSS PATTERN
+		BossInfo* bInfoPtr;
+		bInfoPtr = new BossInfo;
+		bInfoPtr->patternId = 0;
+
+		MsgBundle* bossMsg;
+		bossMsg = new MsgBundle;
+		bossMsg->type = socketManager::BOSS_INFO;
+		bossMsg->ptr = bInfoPtr;
+		clientSendBuffer.push(bossMsg);
+	}
+
+	//HANDLE INPUT MESSAGE
+	for (int i = 0; i < clientSocket.size(); i++)
 	{
 		if (clientReadBuffer[i].size() != 0)
 		{
@@ -216,18 +233,11 @@ void socketManager::Frame()
 			{
 				MsgBundle* tempMsg;
 				tempMsg = clientReadBuffer[i].front();
-				printf("Handling: ");
-				printf("%d\n", tempMsg->type);
 				switch (tempMsg->type)
 				{
 				case PLAYER_INFO:
 					clientSendBuffer.push(tempMsg);
 					break;
-
-				case BOSS_INFO:
-					
-					break;
-
 				case HP_INFO:
 					hpInfo* tempHp;
 					tempHp = (hpInfo*)(tempMsg->ptr);
@@ -236,7 +246,6 @@ void socketManager::Frame()
 					break;
 				}
 				clientReadBuffer[i].pop();
-				printf("done\n");
 			}
 			threadLock[i]->unlock();
 		}
@@ -294,6 +303,7 @@ MsgBundle* socketManager::receiveMessage(SOCKET ConnectSocket)
 		playerInput pInfo;
 		hpInfo hInfo;
 		InitialParamBundle paramInfo;
+		BossInfo bInfo;
 		switch (msgType)
 		{
 		case PLAYER_INFO:
@@ -302,10 +312,15 @@ MsgBundle* socketManager::receiveMessage(SOCKET ConnectSocket)
 			pInfoPtr = new playerInput;
 			CopyPlayerInfo(pInfoPtr, &pInfo);
 			msgBundle->ptr = pInfoPtr;
+			PrintPlayerInput(pInfoPtr);
 			break;
 
 		case BOSS_INFO:
-
+			ia >> bInfo;
+			BossInfo* bInfoPtr;
+			bInfoPtr = new BossInfo;
+			CopyBossInfo(bInfoPtr, &bInfo);
+			msgBundle->ptr = bInfoPtr;
 			break;
 
 		case ITEM_INFO:
@@ -350,6 +365,7 @@ int socketManager::sendMessage(SOCKET ClientSocket, MsgBundle* msgBundle)
 	playerInput pinput;
 	hpInfo hInfo;
 	InitialParamBundle paramInfo;
+	BossInfo bInfo;
 	switch (msgBundle->type)
 	{
 	case PLAYER_INFO:
@@ -357,7 +373,8 @@ int socketManager::sendMessage(SOCKET ClientSocket, MsgBundle* msgBundle)
 		oa << pinput;
 		break;
 	case BOSS_INFO:
-
+		CopyBossInfo(&bInfo, (BossInfo*)(msgBundle->ptr));
+		oa << bInfo;
 		break;
 	case ITEM_INFO:
 
@@ -412,10 +429,9 @@ void socketManager::HandleHpInfo(hpInfo* tempHp)
 	//Damage
 	if (tempHp->playerHitCount > 0)
 	{
-		//--dataCenter::playerHp[tempHp->playerId];
 		std::cout << "playerId: " + std::to_string(tempHp->playerId) << std::endl;
-		--dataCenter::playerHp[tempHp->playerId];
-		dataCenter::playerHp[1] = 0;
+		//--dataCenter::playerHp[tempHp->playerId];
+		//dataCenter::playerHp[1] = 0;
 	}
 	if (tempHp->bossHitCount > 0)
 	{
@@ -440,11 +456,14 @@ void socketManager::CopyPlayerInfo(playerInput* dest, playerInput* src)
 	for (int i = 0; i < sizeof(src->mouseInput); i++)
 		dest->mouseInput[i] = src->mouseInput[i];
 	for (int i = 0; i < 3; i++)
+	{
 		dest->playerPos[i] = src->playerPos[i];
-	dest->mouseX = src->mouseX;
-	dest->mouseY = src->mouseY;
+		dest->mouseDirVec[i] = src->mouseDirVec[i];
+	}
+
 	dest->playerId = src->playerId;
 }
+
 
 void socketManager::CopyHpInfo(hpInfo* dest, hpInfo* src)
 {
@@ -473,4 +492,17 @@ void socketManager::CopyItemInfo(ItemInfo* dest, ItemInfo* src)
 {
 	dest->itemId = src->itemId;
 	dest->playerId = src->itemId;
+}
+
+void socketManager::CopyBossInfo(BossInfo* dest, BossInfo* src)
+{
+	dest->patternId = src->patternId;
+}
+
+void socketManager::PrintPlayerInput(playerInput* temp)
+{
+	printf("PlayerId: %d\n",temp->playerId);
+	printf("PlayerPos: [%d,%d,%d]\n", temp->playerPos[0], temp->playerPos[1], temp->playerPos[2]);
+	//printf("mouseX: %d mouseY: %d\n", temp->mouseX, temp->mouseY);
+	std::cout << "mouseInput: " + std::to_string(temp->mouseInput[0]) << std::endl;
 }
