@@ -14,7 +14,7 @@
 
 #include "socketManager.h"
 
-#define CLIENT_COUNT 1
+#define CLIENT_COUNT 2
 
 socketManager::socketManager()
 {
@@ -27,6 +27,9 @@ socketManager::socketManager()
 
 		std::queue<MsgBundle*> tempQueue;
 		clientReadBuffer.push_back(tempQueue);
+
+		std::queue<MsgBundle*> tempFrame;
+		frameCount.push_back(tempFrame);
 
 		std::mutex* tempMutex = new std::mutex();
 		threadLock.push_back(tempMutex);
@@ -139,12 +142,14 @@ void socketManager::ListenToClients(int clientId)
 			threadLock[clientId]->lock();
 			std::cout << recvBuffer << std::endl;
 			
-			/*std::cout << "[thread]ID: " << ((playerInput*)(tempMsg->ptr))->playerId << std::endl;
-			std::cout << "[thread]mouseX: " << ((playerInput*)(tempMsg->ptr))->mouseX << std::endl;
-			std::cout << "[thread]mouseY: " << ((playerInput*)(tempMsg->ptr))->mouseY << std::endl;
-			std::cout << "[thread]playerPos x:" << ((playerInput*)(tempMsg->ptr))->playerPos[0] << std::endl << std::endl;*/
-			
-			clientReadBuffer[clientId].push(tempMsg);
+			if (tempMsg->type == FRAME_INFO)
+			{
+				std::cout << "Frame Info Input!" << std::endl;
+				frameCount[clientId].push(tempMsg);
+			}
+			else
+				clientReadBuffer[clientId].push(tempMsg);
+
 			threadLock[clientId]->unlock();
 		}
 	}
@@ -208,20 +213,59 @@ void socketManager::Shutdown()
 void socketManager::Frame()
 {
 	count++;
+	
+	//if (count % 1000 == 0)
+	//{
+	//	//SEND BOSS PATTERN
+	//	BossInfo* bInfoPtr;
+	//	bInfoPtr = new BossInfo;
+	//	bInfoPtr->patternId = 0;
 
-	if (count % 600 == 0)
+	//	MsgBundle* bossMsg;
+	//	bossMsg = new MsgBundle;
+	//	bossMsg->type = socketManager::BOSS_INFO;
+	//	bossMsg->ptr = bInfoPtr;
+	//	clientSendBuffer.push(bossMsg);
+	//}
+
+	//Client들의 Frame 진행도 확인
+	bool continueFlag = false;
+	if (frameCount[0].size() > 0)
 	{
-		//SEND BOSS PATTERN
-		BossInfo* bInfoPtr;
-		bInfoPtr = new BossInfo;
-		bInfoPtr->patternId = 0;
+		continueFlag = true;
+		int checkFrame = ((FrameInfo*)(frameCount[0].front()->ptr))->frameNum;
 
-		MsgBundle* bossMsg;
-		bossMsg = new MsgBundle;
-		bossMsg->type = socketManager::BOSS_INFO;
-		bossMsg->ptr = bInfoPtr;
-		clientSendBuffer.push(bossMsg);
+		for (int i = 1; i < CLIENT_COUNT; i++)
+		{
+			if (frameCount[i].size() <= 0)
+			{
+				continueFlag = false;
+				break;
+			}
+			else {
+				int tempCheckFrame = ((FrameInfo*)(frameCount[i].front()->ptr))->frameNum;
+				if (tempCheckFrame != checkFrame)
+					continueFlag = false;
+			}
+		}
 	}
+	//Client들이 같은 지점까지 진행되면
+	if (continueFlag)
+	{
+		MsgBundle* sendFrame = frameCount[0].front();
+		((FrameInfo*)(sendFrame->ptr))->frameNum += 20;
+		clientSendBuffer.push(sendFrame);
+		
+		MsgBundle* garbage;
+		for (int i = 1; i < CLIENT_COUNT; i++)
+		{
+			garbage = frameCount[i].front();
+			frameCount[i].pop();
+			delete garbage->ptr;
+			delete garbage;
+		}
+	}
+
 
 	//HANDLE INPUT MESSAGE
 	for (int i = 0; i < clientSocket.size(); i++)
@@ -236,6 +280,8 @@ void socketManager::Frame()
 				switch (tempMsg->type)
 				{
 				case PLAYER_INFO:
+					if (((playerInput*)(tempMsg->ptr))->keyInput[4] == 42)
+						std::cout << "SHIFT!!!" << std::endl;
 					clientSendBuffer.push(tempMsg);
 					break;
 				case HP_INFO:
@@ -256,12 +302,21 @@ void socketManager::Frame()
 
 void socketManager::CloseClientSockets(std::vector<int> index)
 {
+	for (int i = index.size() - 1; i >= 0; i--)
+	{
+		std::cout << "Closing client id: " + index[i] << std::endl;;
+		closesocket(clientSocket[index[i]]);
+		clientSocket.erase(clientSocket.begin() + i);
+	}
+/*
 	for (auto iter = index.end(); iter != index.begin(); iter--)
 	{
 		std::cout << "Closing client id: " + std::to_string(*iter) << std::endl;;
 		closesocket(clientSocket[*iter]);
 		clientSocket.erase(clientSocket.begin() + *iter);
-	}
+	}*/
+	
+
 }
 
 MsgBundle* socketManager::receiveMessage(SOCKET ConnectSocket)
@@ -304,6 +359,7 @@ MsgBundle* socketManager::receiveMessage(SOCKET ConnectSocket)
 		hpInfo hInfo;
 		InitialParamBundle paramInfo;
 		BossInfo bInfo;
+		FrameInfo fInfo;
 		switch (msgType)
 		{
 		case PLAYER_INFO:
@@ -335,13 +391,21 @@ MsgBundle* socketManager::receiveMessage(SOCKET ConnectSocket)
 			CopyHpInfo(hInfoPtr, &hInfo);
 			msgBundle->ptr = hInfoPtr;
 			break;
+
 		case PARAM_INFO:
 			ia >> paramInfo;
 			InitialParamBundle* paramInfoPtr;
 			paramInfoPtr = new InitialParamBundle;
 			CopyInitialParamBundle(paramInfoPtr, &paramInfo);
-
 			msgBundle->ptr = paramInfoPtr;
+			break;
+
+		case FRAME_INFO:
+			ia >> fInfo;
+			FrameInfo* fInfoPtr;
+			fInfoPtr = new FrameInfo;
+			CopyFrameInfo(fInfoPtr, &fInfo);
+			msgBundle->ptr = fInfoPtr;
 			break;
 		}
 		msgBundle->type = msgType;
@@ -366,6 +430,7 @@ int socketManager::sendMessage(SOCKET ClientSocket, MsgBundle* msgBundle)
 	hpInfo hInfo;
 	InitialParamBundle paramInfo;
 	BossInfo bInfo;
+	FrameInfo fInfo;
 	switch (msgBundle->type)
 	{
 	case PLAYER_INFO:
@@ -386,6 +451,10 @@ int socketManager::sendMessage(SOCKET ClientSocket, MsgBundle* msgBundle)
 	case PARAM_INFO:
 		CopyInitialParamBundle(&paramInfo, (InitialParamBundle*)(msgBundle->ptr));
 		oa << paramInfo;
+		break;
+	case FRAME_INFO:
+		CopyFrameInfo(&fInfo, (FrameInfo*)(msgBundle->ptr));
+		oa << fInfo;
 		break;
 	}
 
@@ -430,8 +499,8 @@ void socketManager::HandleHpInfo(hpInfo* tempHp)
 	if (tempHp->playerHitCount > 0)
 	{
 		std::cout << "playerId: " + std::to_string(tempHp->playerId) << std::endl;
-		//--dataCenter::playerHp[tempHp->playerId];
-		//dataCenter::playerHp[1] = 0;
+		--dataCenter::playerHp[tempHp->playerId];
+		
 	}
 	if (tempHp->bossHitCount > 0)
 	{
@@ -497,6 +566,12 @@ void socketManager::CopyItemInfo(ItemInfo* dest, ItemInfo* src)
 void socketManager::CopyBossInfo(BossInfo* dest, BossInfo* src)
 {
 	dest->patternId = src->patternId;
+}
+
+void socketManager::CopyFrameInfo(FrameInfo* dest, FrameInfo* src)
+{
+	dest->playerId = src->playerId;
+	dest->frameNum = src->frameNum;
 }
 
 void socketManager::PrintPlayerInput(playerInput* temp)

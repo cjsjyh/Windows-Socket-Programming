@@ -21,7 +21,33 @@ using namespace boost::iostreams;
 #include <ws2tcpip.h>
 #pragma comment (lib, "Ws2_32.lib")
 
+class FrameInfo {
+public:
+	friend class boost::serialization::access;
 
+	FrameInfo()
+	{
+
+	}
+
+	FrameInfo(int num, int id)
+	{
+		playerId = id;
+		frameNum = num;
+	}
+
+	~FrameInfo() {
+
+	}
+	int playerId;
+	int frameNum;
+
+	template<class Archive>
+	void serialize(Archive& ar, const unsigned int version) {
+		ar& playerId;
+		ar& frameNum;
+	}
+};
 
 class playerInput
 {
@@ -217,7 +243,8 @@ public:
 		BOSS_INFO,
 		HP_INFO,
 		ITEM_INFO,
-		PARAM_INFO
+		PARAM_INFO,
+		FRAME_INFO
 	};
 
 	enum ItemType
@@ -249,6 +276,7 @@ private:
 	void CopyInitialParamBundle(InitialParamBundle*, InitialParamBundle*);
 	void CopyItemInfo(ItemInfo*, ItemInfo*);
 	void CopyBossInfo(BossInfo*, BossInfo*);
+	void CopyFrameInfo(FrameInfo*, FrameInfo*);
 
 	void HandleHpInfo(hpInfo*);
 
@@ -264,6 +292,7 @@ private:
 	std::vector<std::mutex*> threadLock;
 
 	std::vector<std::queue<MsgBundle*>> clientReadBuffer;
+	std::vector<std::queue<MsgBundle*>> frameCount;
 	std::queue<MsgBundle*> clientSendBuffer;
 
 	SOCKET ListenSocket;
