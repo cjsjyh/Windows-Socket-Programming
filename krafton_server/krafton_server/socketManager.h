@@ -275,6 +275,7 @@ public:
 	MsgBundle* receiveMessage(SOCKET ConnectSocket);
 	int sendMessage(SOCKET ConnectSocket, MsgBundle*);
 private:
+	void SendInitialParameters();
 	void CloseClientSockets(std::vector<int>);
 
 	void CopyPlayerInfo(playerInput*, playerInput*);
@@ -285,8 +286,6 @@ private:
 	void CopyFrameInfo(FrameInfo*, FrameInfo*);
 
 	void HandleHpInfo(hpInfo*);
-
-	void PrintPlayerInput(playerInput*);
 
 private:
 	char sendBuffer[BUFFER_SIZE];
@@ -303,6 +302,8 @@ private:
 
 	SOCKET ListenSocket;
 	int count;
+	int curClientCount;
+	bool fadeFlag;
 };
 
 #endif

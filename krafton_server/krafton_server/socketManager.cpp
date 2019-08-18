@@ -20,6 +20,7 @@
 socketManager::socketManager()
 {
 	count = 0;
+	fadeFlag = false;
 
 	for (int i = 0; i < CLIENT_COUNT; i++)
 	{
@@ -44,6 +45,7 @@ socketManager::~socketManager()
 
 int socketManager::Initialize()
 {
+	curClientCount = CLIENT_COUNT;
 	srand((unsigned int)time(NULL));
 
 	struct addrinfo* result = NULL;
@@ -107,15 +109,7 @@ int socketManager::Initialize()
 			--i;
 
 	//Set initial HP parameters
-	MsgBundle* tempMsgParam = new MsgBundle;
-	InitialParamBundle* tempParam = new InitialParamBundle(dataCenter::playerMaxHp, 
-															dataCenter::bossMaxHp, 
-															dataCenter::bossPhase2Hp, 
-															dataCenter::bossPhase3Hp);
-	tempMsgParam->type = PARAM_INFO;
-	tempMsgParam->ptr = tempParam;
-	clientSendBuffer.push(tempMsgParam);
-	PushToClients();
+	SendInitialParameters();
 
 	//Make new thread for each Client
 	for (int i = 0; i < CLIENT_COUNT; i++)
@@ -129,6 +123,19 @@ int socketManager::Initialize()
 	return 1;
 }
 
+void socketManager::SendInitialParameters()
+{
+	MsgBundle* tempMsgParam = new MsgBundle;
+	InitialParamBundle* tempParam = new InitialParamBundle(dataCenter::playerMaxHp,
+		dataCenter::bossMaxHp,
+		dataCenter::bossPhase2Hp,
+		dataCenter::bossPhase3Hp);
+	tempMsgParam->type = PARAM_INFO;
+	tempMsgParam->ptr = tempParam;
+	clientSendBuffer.push(tempMsgParam);
+	PushToClients();
+}
+
 void socketManager::ListenToClients(int clientId)
 {
 	bool flag = true;
@@ -137,7 +144,18 @@ void socketManager::ListenToClients(int clientId)
 		MsgBundle* tempMsg = receiveMessage(clientSocket[clientId]);
 		if (tempMsg == NULL)
 		{
-			printf("Receive Failed. terminating thread");
+			/*
+			curClientCount--;
+			printf("Receive Failed. Client Lost\n");
+			closesocket(clientSocket[clientId]);
+			clientSocket[clientId] = INVALID_SOCKET;
+			printf("Waiting for Client\n");
+			CheckNewConnection(clientId);
+			printf("New Connection Made");
+			curClientCount++;
+			SendInitialParameters();
+			*/
+			printf("Receive Failed. Client Lost\n");
 			flag = false;
 		}
 		else
@@ -165,16 +183,16 @@ void socketManager::PushToClients()
 	int size = clientSendBuffer.size();
 	for (int i = 0; i < size; i++)
 	{
-		for (auto iter = clientSocket.begin(); iter != clientSocket.end(); iter++)
+		for (int j=0;j<curClientCount;j++)
 		{
-			if (sendMessage(*iter, clientSendBuffer.front()) == -1)
-				index.push_back(distance(clientSocket.begin(), iter));
+			if (sendMessage(clientSocket[j], clientSendBuffer.front()) == -1)
+				index.push_back(j);
 		}
 		clientSendBuffer.pop();
 	}
 
 	//close invalid sockets
-	CloseClientSockets(index);
+	//CloseClientSockets(index);
 	return;
 }
 
@@ -219,12 +237,12 @@ void socketManager::Frame()
 
 	//Client들의 Frame 진행도 확인
 	bool continueFlag = false;
-	if (frameCount[0].size() > 0)
+	if (frameCount[0].size() > 0 && curClientCount != 0)
 	{
 		continueFlag = true;
 		int checkFrame = ((FrameInfo*)(frameCount[0].front()->ptr))->frameNum;
 
-		for (int i = 1; i < CLIENT_COUNT; i++)
+		for (int i = 1; i < curClientCount; i++)
 		{
 			if (frameCount[i].size() <= 0)
 			{
@@ -253,7 +271,7 @@ void socketManager::Frame()
 		threadLock[0]->unlock();
 
 		MsgBundle* garbage;
-		for (int i = 1; i < CLIENT_COUNT; i++)
+		for (int i = 1; i < curClientCount; i++)
 		{
 			threadLock[i]->lock();
 			garbage = frameCount[i].front();
@@ -279,7 +297,7 @@ void socketManager::Frame()
 
 
 	//HANDLE INPUT MESSAGE
-	for (int i = 0; i < clientSocket.size(); i++)
+	for (int i = 0; i < curClientCount; i++)
 	{
 		if (clientReadBuffer[i].size() != 0)
 		{
@@ -308,6 +326,38 @@ void socketManager::Frame()
 		}
 	}
 
+	//restart game
+	bool restartFlag = true;
+	for (int i = 0; i < curClientCount; i++)
+		if (dataCenter::playerHp[i] > 0)
+			restartFlag = false;
+	if (dataCenter::bossHp <= 0)
+		restartFlag = true;
+
+	if (restartFlag)
+	{
+		if (!fadeFlag)
+		{
+			fadeFlag = true;
+		}
+		else
+		{
+			fadeFlag = false;
+			dataCenter::playerHp[0] = dataCenter::playerHp[1] = dataCenter::playerMaxHp;
+			dataCenter::bossHp = dataCenter::bossMaxHp;
+		}
+		MsgBundle* tempMsg = new MsgBundle;
+
+		hpInfo* tempHp = new hpInfo;
+		tempHp->playerHp[0] = dataCenter::playerHp[0];
+		tempHp->playerHp[1] = dataCenter::playerHp[1];
+		tempHp->bossHp = dataCenter::bossHp;
+
+		tempMsg->ptr = tempHp;
+		tempMsg->type = HP_INFO;
+		clientSendBuffer.push(tempMsg);
+	}
+
 	PushToClients();
 }
 
@@ -319,14 +369,6 @@ void socketManager::CloseClientSockets(std::vector<int> index)
 		closesocket(clientSocket[index[i]]);
 		clientSocket.erase(clientSocket.begin() + i);
 	}
-/*
-	for (auto iter = index.end(); iter != index.begin(); iter--)
-	{
-		std::cout << "Closing client id: " + std::to_string(*iter) << std::endl;;
-		closesocket(clientSocket[*iter]);
-		clientSocket.erase(clientSocket.begin() + *iter);
-	}*/
-	
 
 }
 
@@ -379,7 +421,6 @@ MsgBundle* socketManager::receiveMessage(SOCKET ConnectSocket)
 			pInfoPtr = new playerInput;
 			CopyPlayerInfo(pInfoPtr, &pInfo);
 			msgBundle->ptr = pInfoPtr;
-			PrintPlayerInput(pInfoPtr);
 			break;
 
 		case BOSS_INFO:
@@ -523,7 +564,6 @@ void socketManager::HandleHpInfo(hpInfo* tempHp)
 		dataCenter::playerHp[i] += tempHp->playerHeal[i];
 	dataCenter::bossHp += tempHp->bossHeal;
 
-
 	tempHp->playerHp[0] = dataCenter::playerHp[0];
 	tempHp->playerHp[1] = dataCenter::playerHp[1];
 	tempHp->bossHp = dataCenter::bossHp;
@@ -585,12 +625,4 @@ void socketManager::CopyFrameInfo(FrameInfo* dest, FrameInfo* src)
 {
 	dest->playerId = src->playerId;
 	dest->frameNum = src->frameNum;
-}
-
-void socketManager::PrintPlayerInput(playerInput* temp)
-{
-	printf("PlayerId: %d\n",temp->playerId);
-	printf("PlayerPos: [%d,%d,%d]\n", temp->playerPos[0], temp->playerPos[1], temp->playerPos[2]);
-	//printf("mouseX: %d mouseY: %d\n", temp->mouseX, temp->mouseY);
-	std::cout << "mouseInput: " + std::to_string(temp->mouseInput[0]) << std::endl;
 }
