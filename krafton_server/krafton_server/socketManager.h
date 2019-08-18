@@ -73,6 +73,7 @@ public:
 
 	}
 	int playerId;
+	int frame;
 	float playerPos[3];
 
 	float mouseDirVec[3];
@@ -82,6 +83,7 @@ public:
 	template<class Archive>
 	void serialize(Archive& ar, const unsigned int version) {
 		ar& playerId;
+		ar& frame;
 		ar& playerPos;
 
 		ar& mouseDirVec;
@@ -183,10 +185,14 @@ public:
 	}
 
 	int patternId;
+	int frame;
+	int targetid;
 
 	template<class Archive>
 	void serialize(Archive& ar, const unsigned int version) {
 		ar& patternId;
+		ar& frame;
+		ar& targetid;
 	}
 };
 

@@ -9,12 +9,13 @@
 #include "dataCenter.h"
 
 #include <string>
-
+#include <ctime>
+#include <stdlib.h>
 
 
 #include "socketManager.h"
 
-#define CLIENT_COUNT 2
+#define CLIENT_COUNT 1
 
 socketManager::socketManager()
 {
@@ -43,6 +44,8 @@ socketManager::~socketManager()
 
 int socketManager::Initialize()
 {
+	srand((unsigned int)time(NULL));
+
 	struct addrinfo* result = NULL;
 	struct addrinfo hints;
 	ZeroMemory(&hints, sizeof(hints));
@@ -213,20 +216,6 @@ void socketManager::Shutdown()
 void socketManager::Frame()
 {
 	count++;
-	
-	//if (count % 1000 == 0)
-	//{
-	//	//SEND BOSS PATTERN
-	//	BossInfo* bInfoPtr;
-	//	bInfoPtr = new BossInfo;
-	//	bInfoPtr->patternId = 0;
-
-	//	MsgBundle* bossMsg;
-	//	bossMsg = new MsgBundle;
-	//	bossMsg->type = socketManager::BOSS_INFO;
-	//	bossMsg->ptr = bInfoPtr;
-	//	clientSendBuffer.push(bossMsg);
-	//}
 
 	//Client들의 Frame 진행도 확인
 	bool continueFlag = false;
@@ -252,18 +241,40 @@ void socketManager::Frame()
 	//Client들이 같은 지점까지 진행되면
 	if (continueFlag)
 	{
+		int currentFrame;
 		MsgBundle* sendFrame = frameCount[0].front();
-		((FrameInfo*)(sendFrame->ptr))->frameNum += 20;
+
+		currentFrame = ((FrameInfo*)(sendFrame->ptr))->frameNum;
+		((FrameInfo*)(sendFrame->ptr))->frameNum = currentFrame + 60;
 		clientSendBuffer.push(sendFrame);
 		
+		threadLock[0]->lock();
+		frameCount[0].pop();
+		threadLock[0]->unlock();
+
 		MsgBundle* garbage;
 		for (int i = 1; i < CLIENT_COUNT; i++)
 		{
+			threadLock[i]->lock();
 			garbage = frameCount[i].front();
 			frameCount[i].pop();
 			delete garbage->ptr;
 			delete garbage;
+			threadLock[i]->unlock();
 		}
+
+		//SEND BOSS PATTERN
+		BossInfo* bInfoPtr;
+		bInfoPtr = new BossInfo;
+		bInfoPtr->patternId = 0;
+		bInfoPtr->frame = currentFrame + 60;
+		bInfoPtr->targetid = rand()%2;
+
+		MsgBundle* bossMsg;
+		bossMsg = new MsgBundle;
+		bossMsg->type = socketManager::BOSS_INFO;
+		bossMsg->ptr = bInfoPtr;
+		clientSendBuffer.push(bossMsg);
 	}
 
 
@@ -488,7 +499,7 @@ int socketManager::sendMessage(SOCKET ClientSocket, MsgBundle* msgBundle)
 		return -1;
 	}
 
-	printf("[Success] Bytes sent: %d\n", iSendResult);
+	//printf("[Success] Bytes sent: %d\n", iSendResult);
 	return iSendResult;
 }
 
@@ -566,6 +577,8 @@ void socketManager::CopyItemInfo(ItemInfo* dest, ItemInfo* src)
 void socketManager::CopyBossInfo(BossInfo* dest, BossInfo* src)
 {
 	dest->patternId = src->patternId;
+	dest->frame = src->frame;
+	dest->targetid = src->targetid;
 }
 
 void socketManager::CopyFrameInfo(FrameInfo* dest, FrameInfo* src)
