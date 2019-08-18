@@ -284,7 +284,7 @@ void socketManager::Frame()
 		//SEND BOSS PATTERN
 		BossInfo* bInfoPtr;
 		bInfoPtr = new BossInfo;
-		bInfoPtr->patternId = 0;
+		bInfoPtr->patternId = rand()%5;
 		bInfoPtr->frame = currentFrame + 60;
 		bInfoPtr->targetid = rand()%2;
 
