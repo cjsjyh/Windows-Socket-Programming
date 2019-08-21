@@ -73,7 +73,6 @@ public:
 
 	}
 	int playerId;
-	int frame;
 	float playerPos[3];
 
 	float mouseDirVec[3];
@@ -83,7 +82,6 @@ public:
 	template<class Archive>
 	void serialize(Archive& ar, const unsigned int version) {
 		ar& playerId;
-		ar& frame;
 		ar& playerPos;
 
 		ar& mouseDirVec;
@@ -272,8 +270,8 @@ public:
 	void ListenToClients(int);
 	void PushToClients();
 
-	MsgBundle* receiveMessage(SOCKET ConnectSocket);
-	int sendMessage(SOCKET ConnectSocket, MsgBundle*);
+	MsgBundle* receiveMessage(int,SOCKET ConnectSocket);
+	int sendMessage(int,SOCKET ConnectSocket, MsgBundle*);
 private:
 	void SendInitialParameters();
 	void CloseClientSockets(std::vector<int>);
@@ -288,8 +286,8 @@ private:
 	void HandleHpInfo(hpInfo*);
 
 private:
-	char sendBuffer[BUFFER_SIZE];
-	char recvBuffer[BUFFER_SIZE];
+	char sendBuffer[2][BUFFER_SIZE];
+	char recvBuffer[2][BUFFER_SIZE];
 	std::vector<int> delimiterIndex;
 
 	std::vector<SOCKET> clientSocket;

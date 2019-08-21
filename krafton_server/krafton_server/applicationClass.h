@@ -19,7 +19,6 @@ private:
 	socketManager* m_Socket;
 	textReader* m_tReader;
 
-
 };
 
 #endif

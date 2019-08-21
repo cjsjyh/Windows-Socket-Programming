@@ -1,5 +1,6 @@
 #undef UNICODE
 
+#define _CRT_SECURE_NO_WARNINGS
 #define WIN32_LEAN_AND_MEAN
 
 #include <iostream>
@@ -12,10 +13,9 @@
 #include <ctime>
 #include <stdlib.h>
 
-
 #include "socketManager.h"
 
-#define CLIENT_COUNT 1
+#define CLIENT_COUNT 2
 
 socketManager::socketManager()
 {
@@ -113,8 +113,11 @@ int socketManager::Initialize()
 
 	//Make new thread for each Client
 	for (int i = 0; i < CLIENT_COUNT; i++)
-		clientThread.push_back(std::thread([&,i]() {ListenToClients(i);}));
-
+	{
+		int opt_val = TRUE;
+		setsockopt(clientSocket[i], IPPROTO_TCP, TCP_NODELAY, (const char*)&opt_val, sizeof(opt_val));
+		clientThread.push_back(std::thread([&, i]() {ListenToClients(i); }));
+	}
 	//detach threads
 	for (int i = 0; i < CLIENT_COUNT; i++)
 		clientThread[i].detach();
@@ -141,7 +144,7 @@ void socketManager::ListenToClients(int clientId)
 	bool flag = true;
 	while (flag)
 	{
-		MsgBundle* tempMsg = receiveMessage(clientSocket[clientId]);
+		MsgBundle* tempMsg = receiveMessage(clientId, clientSocket[clientId]);
 		if (tempMsg == NULL)
 		{
 			/*
@@ -161,11 +164,10 @@ void socketManager::ListenToClients(int clientId)
 		else
 		{
 			threadLock[clientId]->lock();
-			std::cout << recvBuffer << std::endl;
+			std::cout << recvBuffer << std::endl << std::endl;
 			
 			if (tempMsg->type == FRAME_INFO)
 			{
-				std::cout << "Frame Info Input!" << std::endl;
 				frameCount[clientId].push(tempMsg);
 			}
 			else
@@ -185,7 +187,7 @@ void socketManager::PushToClients()
 	{
 		for (int j=0;j<curClientCount;j++)
 		{
-			if (sendMessage(clientSocket[j], clientSendBuffer.front()) == -1)
+			if (sendMessage(j, clientSocket[j], clientSendBuffer.front()) == -1)
 				index.push_back(j);
 		}
 		clientSendBuffer.pop();
@@ -372,37 +374,50 @@ void socketManager::CloseClientSockets(std::vector<int> index)
 
 }
 
-MsgBundle* socketManager::receiveMessage(SOCKET ConnectSocket)
+MsgBundle* socketManager::receiveMessage(int id, SOCKET ConnectSocket)
 {
 	int iResult;
 
+	std::cout << "Before MsgType" << std::endl;
 	//Receive Type of Data
-	memset(recvBuffer, 0, sizeof(recvBuffer));
-	iResult = recv(ConnectSocket, recvBuffer, sizeof(int), 0);
+	memset(recvBuffer[id], 0, sizeof(recvBuffer[id]));
+	std::cout << "after memset" << std::endl;
+	iResult = recv(ConnectSocket, recvBuffer[id], sizeof(int), 0);
 	if (iResult <= 0)
 	{
 		printf("[ERROR] Recv Type Failed");
 		return NULL;
 	}
-	int msgType = std::stoi(recvBuffer);
+	printf("before stoi [%s]\n",recvBuffer[id]);
+	int msgType = std::stoi(recvBuffer[id]);
+
+	std::cout << "MsgType:: " + std::to_string(msgType) << std::endl;
 
 	//Receive Size of Data
-	memset(recvBuffer, 0, sizeof(recvBuffer));
-	iResult = recv(ConnectSocket, recvBuffer, sizeof(int), 0);
+	memset(recvBuffer[id], 0, sizeof(recvBuffer[id]));
+	iResult = recv(ConnectSocket, recvBuffer[id], sizeof(int), 0);
 	if (iResult <= 0)
 	{
 		printf("[ERROR] Recv Len Failed");
 		return NULL;
 	}
-	int msgLen = std::stoi(recvBuffer);
+	int msgLen = std::stoi(recvBuffer[id]);
+
+	std::cout << "MsgLen:: " + std::to_string(msgLen) << std::endl;
+	/*if (msgLen <= 0)
+		return NULL;*/
 
 	//Receive Data
-	memset(recvBuffer, 0, sizeof(recvBuffer));
-	iResult = recv(ConnectSocket, recvBuffer, msgLen, 0);
+	memset(recvBuffer[id], 0, sizeof(recvBuffer[id]));
+	iResult = recv(ConnectSocket, recvBuffer[id], msgLen, 0);
+	std::cout << "RECV:: " << recvBuffer[id] << std::endl;
+	/*if (strlen(recvBuffer) != msgLen)
+		return NULL;*/
+
 	if (iResult > 0)
 	{
 		std::stringstream ss;
-		ss.write(recvBuffer, msgLen);
+		ss.write(recvBuffer[id], msgLen);
 		boost::archive::text_iarchive ia(ss);
 
 		MsgBundle* msgBundle = new MsgBundle;
@@ -469,12 +484,12 @@ MsgBundle* socketManager::receiveMessage(SOCKET ConnectSocket)
 	return NULL;
 }
 
-int socketManager::sendMessage(SOCKET ClientSocket, MsgBundle* msgBundle)
+int socketManager::sendMessage(int id, SOCKET ClientSocket, MsgBundle* msgBundle)
 {
 	int iSendResult;
 
-	memset(sendBuffer, 0, sizeof(sendBuffer));
-	array_sink sink{ sendBuffer };
+	memset(sendBuffer[id], 0, sizeof(sendBuffer[id]));
+	array_sink sink{ sendBuffer[id] };
 	stream<array_sink> os{ sink };
 	boost::archive::text_oarchive oa(os);
 
@@ -510,7 +525,7 @@ int socketManager::sendMessage(SOCKET ClientSocket, MsgBundle* msgBundle)
 		break;
 	}
 
-	sendBuffer[strlen(sendBuffer)] = '\n';
+	sendBuffer[id][strlen(sendBuffer[id])] = '\n';
 
 	iSendResult = 0;
 	while (!iSendResult)
@@ -525,14 +540,14 @@ int socketManager::sendMessage(SOCKET ClientSocket, MsgBundle* msgBundle)
 	iSendResult = 0;
 	while (!iSendResult)
 	{
-		std::string msgLen = std::to_string(strlen(sendBuffer));
+		std::string msgLen = std::to_string(strlen(sendBuffer[id]));
 		const char* msgLenChar = msgLen.c_str();
 		iSendResult = send(ClientSocket, msgLenChar, sizeof(int), 0);
 		if (!iSendResult)
 			printf("Send Len Failed\n");
 	}
 
-	iSendResult = send(ClientSocket, sendBuffer, strlen(sendBuffer), 0);
+	iSendResult = send(ClientSocket, sendBuffer[id], strlen(sendBuffer[id]), 0);
 	if (iSendResult == SOCKET_ERROR) {
 		printf("Send Msg Failed with error: %d\n", WSAGetLastError());
 		closesocket(ClientSocket);
