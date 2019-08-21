@@ -284,6 +284,7 @@ private:
 	void CopyFrameInfo(FrameInfo*, FrameInfo*);
 
 	void HandleHpInfo(hpInfo*);
+	bool IsAnyKeyPressed(playerInput*);
 
 private:
 	char sendBuffer[2][BUFFER_SIZE];
@@ -302,6 +303,8 @@ private:
 	int count;
 	int curClientCount;
 	bool fadeFlag;
+	
+	bool playerReady[2];
 };
 
 #endif

@@ -35,6 +35,8 @@ socketManager::socketManager()
 
 		std::mutex* tempMutex = new std::mutex();
 		threadLock.push_back(tempMutex);
+		
+		playerReady[i] = false;
 	}
 }
 
@@ -147,24 +149,12 @@ void socketManager::ListenToClients(int clientId)
 		MsgBundle* tempMsg = receiveMessage(clientId, clientSocket[clientId]);
 		if (tempMsg == NULL)
 		{
-			/*
-			curClientCount--;
-			printf("Receive Failed. Client Lost\n");
-			closesocket(clientSocket[clientId]);
-			clientSocket[clientId] = INVALID_SOCKET;
-			printf("Waiting for Client\n");
-			CheckNewConnection(clientId);
-			printf("New Connection Made");
-			curClientCount++;
-			SendInitialParameters();
-			*/
 			printf("Receive Failed. Client Lost\n");
 			flag = false;
 		}
 		else
 		{
 			threadLock[clientId]->lock();
-			std::cout << recvBuffer << std::endl << std::endl;
 			
 			if (tempMsg->type == FRAME_INFO)
 			{
@@ -283,18 +273,25 @@ void socketManager::Frame()
 			threadLock[i]->unlock();
 		}
 
-		//SEND BOSS PATTERN
-		BossInfo* bInfoPtr;
-		bInfoPtr = new BossInfo;
-		bInfoPtr->patternId = rand()%5;
-		bInfoPtr->frame = currentFrame + 60;
-		bInfoPtr->targetid = rand()%2;
+		bool flag = true;
+		for (int i = 0; i < curClientCount; i++)
+			if (!playerReady[i])
+				flag = false;
+		if (flag)
+		{
+			//SEND BOSS PATTERN
+			BossInfo* bInfoPtr;
+			bInfoPtr = new BossInfo;
+			bInfoPtr->patternId = rand() % 5;
+			bInfoPtr->frame = currentFrame + 60;
+			bInfoPtr->targetid = rand() % 2;
 
-		MsgBundle* bossMsg;
-		bossMsg = new MsgBundle;
-		bossMsg->type = socketManager::BOSS_INFO;
-		bossMsg->ptr = bInfoPtr;
-		clientSendBuffer.push(bossMsg);
+			MsgBundle* bossMsg;
+			bossMsg = new MsgBundle;
+			bossMsg->type = socketManager::BOSS_INFO;
+			bossMsg->ptr = bInfoPtr;
+			clientSendBuffer.push(bossMsg);
+		}
 	}
 
 
@@ -308,12 +305,22 @@ void socketManager::Frame()
 			{
 				MsgBundle* tempMsg;
 				tempMsg = clientReadBuffer[i].front();
+				bool flag = true;
 				switch (tempMsg->type)
 				{
 				case PLAYER_INFO:
-					if (((playerInput*)(tempMsg->ptr))->keyInput[4] == 42)
-						std::cout << "SHIFT!!!" << std::endl;
 					clientSendBuffer.push(tempMsg);
+					//Check player ready
+					for (int i = 0; i < curClientCount; i++)
+						if (!playerReady[i])
+							flag = false;
+					if (!flag)
+					{
+						playerInput* pInfo;
+						pInfo = (playerInput*)(tempMsg->ptr);
+						if (IsAnyKeyPressed(pInfo))
+							playerReady[pInfo->playerId] = true;
+					}
 					break;
 				case HP_INFO:
 					hpInfo* tempHp;
@@ -378,20 +385,15 @@ MsgBundle* socketManager::receiveMessage(int id, SOCKET ConnectSocket)
 {
 	int iResult;
 
-	std::cout << "Before MsgType" << std::endl;
 	//Receive Type of Data
 	memset(recvBuffer[id], 0, sizeof(recvBuffer[id]));
-	std::cout << "after memset" << std::endl;
 	iResult = recv(ConnectSocket, recvBuffer[id], sizeof(int), 0);
 	if (iResult <= 0)
 	{
 		printf("[ERROR] Recv Type Failed");
 		return NULL;
 	}
-	printf("before stoi [%s]\n",recvBuffer[id]);
 	int msgType = std::stoi(recvBuffer[id]);
-
-	std::cout << "MsgType:: " + std::to_string(msgType) << std::endl;
 
 	//Receive Size of Data
 	memset(recvBuffer[id], 0, sizeof(recvBuffer[id]));
@@ -403,16 +405,9 @@ MsgBundle* socketManager::receiveMessage(int id, SOCKET ConnectSocket)
 	}
 	int msgLen = std::stoi(recvBuffer[id]);
 
-	std::cout << "MsgLen:: " + std::to_string(msgLen) << std::endl;
-	/*if (msgLen <= 0)
-		return NULL;*/
-
 	//Receive Data
 	memset(recvBuffer[id], 0, sizeof(recvBuffer[id]));
 	iResult = recv(ConnectSocket, recvBuffer[id], msgLen, 0);
-	std::cout << "RECV:: " << recvBuffer[id] << std::endl;
-	/*if (strlen(recvBuffer) != msgLen)
-		return NULL;*/
 
 	if (iResult > 0)
 	{
@@ -452,7 +447,6 @@ MsgBundle* socketManager::receiveMessage(int id, SOCKET ConnectSocket)
 
 		case HP_INFO:
 			ia >> hInfo;
-			//std::cout << "HP: " << recvBuffer << std::endl;
 			hpInfo* hInfoPtr;
 			hInfoPtr = new hpInfo();
 			CopyHpInfo(hInfoPtr, &hInfo);
@@ -525,6 +519,7 @@ int socketManager::sendMessage(int id, SOCKET ClientSocket, MsgBundle* msgBundle
 		break;
 	}
 
+
 	sendBuffer[id][strlen(sendBuffer[id])] = '\n';
 
 	iSendResult = 0;
@@ -555,7 +550,7 @@ int socketManager::sendMessage(int id, SOCKET ClientSocket, MsgBundle* msgBundle
 		return -1;
 	}
 
-	//printf("[Success] Bytes sent: %d\n", iSendResult);
+	printf("[Success] Bytes sent: %d\n", iSendResult);
 	return iSendResult;
 }
 
@@ -565,7 +560,6 @@ void socketManager::HandleHpInfo(hpInfo* tempHp)
 	//Damage
 	if (tempHp->playerHitCount > 0)
 	{
-		std::cout << "playerId: " + std::to_string(tempHp->playerId) << std::endl;
 		--dataCenter::playerHp[tempHp->playerId];
 		
 	}
@@ -612,7 +606,6 @@ void socketManager::CopyHpInfo(hpInfo* dest, hpInfo* src)
 		dest->playerHeal[i] = src->playerHeal[i];
 	}
 	dest->bossHeal = src->bossHeal;
-	printf("Source Heal: %d Dest Heal: %d\n",src->playerHeal[1],dest->playerHeal[0]);
 }
 
 void socketManager::CopyInitialParamBundle(InitialParamBundle* dest, InitialParamBundle* src)
@@ -640,4 +633,14 @@ void socketManager::CopyFrameInfo(FrameInfo* dest, FrameInfo* src)
 {
 	dest->playerId = src->playerId;
 	dest->frameNum = src->frameNum;
+}
+
+bool socketManager::IsAnyKeyPressed(playerInput* pInput)
+{
+	for (int i = 0; i < sizeof(pInput->keyInput) / sizeof(int); i++)
+		if (pInput->keyInput[i] != 0)
+			return true;
+	if (pInput->mouseInput[0])
+		return true;
+	return false;
 }
