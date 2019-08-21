@@ -295,6 +295,12 @@ void socketManager::Frame()
 	}
 
 
+	//Check player ready
+	bool flag = true;
+	for (int i = 0; i < curClientCount; i++)
+		if (!playerReady[i])
+			flag = false;
+
 	//HANDLE INPUT MESSAGE
 	for (int i = 0; i < curClientCount; i++)
 	{
@@ -305,15 +311,10 @@ void socketManager::Frame()
 			{
 				MsgBundle* tempMsg;
 				tempMsg = clientReadBuffer[i].front();
-				bool flag = true;
 				switch (tempMsg->type)
 				{
 				case PLAYER_INFO:
 					clientSendBuffer.push(tempMsg);
-					//Check player ready
-					for (int i = 0; i < curClientCount; i++)
-						if (!playerReady[i])
-							flag = false;
 					if (!flag)
 					{
 						playerInput* pInfo;
@@ -348,6 +349,8 @@ void socketManager::Frame()
 		if (!fadeFlag)
 		{
 			fadeFlag = true;
+			for (int i = 0; i < curClientCount; i++)
+				playerReady[i] = false;
 		}
 		else
 		{
