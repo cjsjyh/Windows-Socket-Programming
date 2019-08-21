@@ -305,6 +305,7 @@ private:
 	bool fadeFlag;
 	
 	bool playerReady[2];
+	int blockInputFrame;
 };
 
 #endif

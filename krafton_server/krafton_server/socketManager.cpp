@@ -21,6 +21,7 @@ socketManager::socketManager()
 {
 	count = 0;
 	fadeFlag = false;
+	blockInputFrame = 0;
 
 	for (int i = 0; i < CLIENT_COUNT; i++)
 	{
@@ -226,6 +227,7 @@ void socketManager::Shutdown()
 void socketManager::Frame()
 {
 	count++;
+	blockInputFrame++;
 
 	//Client들의 Frame 진행도 확인
 	bool continueFlag = false;
@@ -315,7 +317,7 @@ void socketManager::Frame()
 				{
 				case PLAYER_INFO:
 					clientSendBuffer.push(tempMsg);
-					if (!flag)
+					if (!flag && blockInputFrame > 60)
 					{
 						playerInput* pInfo;
 						pInfo = (playerInput*)(tempMsg->ptr);
@@ -351,6 +353,7 @@ void socketManager::Frame()
 			fadeFlag = true;
 			for (int i = 0; i < curClientCount; i++)
 				playerReady[i] = false;
+			blockInputFrame = 0;
 		}
 		else
 		{
