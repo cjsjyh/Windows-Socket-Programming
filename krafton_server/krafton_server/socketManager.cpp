@@ -15,7 +15,7 @@
 
 #include "socketManager.h"
 
-#define CLIENT_COUNT 2
+#define CLIENT_COUNT 1
 
 socketManager::socketManager()
 {
