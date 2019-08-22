@@ -15,13 +15,13 @@
 
 #include "socketManager.h"
 
-#define CLIENT_COUNT 1
+#define CLIENT_COUNT 2
 
 socketManager::socketManager()
 {
 	count = 0;
 	fadeFlag = false;
-	blockInputFrame = 0;
+	blockInputFrame = 60;
 
 	for (int i = 0; i < CLIENT_COUNT; i++)
 	{
@@ -249,6 +249,9 @@ void socketManager::Frame()
 					continueFlag = false;
 			}
 		}
+
+		if (continueFlag)
+			printf("BOTH CLIENT PRECEEDED TO FRAME: %d\n",checkFrame);
 	}
 	//Client들이 같은 지점까지 진행되면
 	if (continueFlag)
@@ -285,7 +288,7 @@ void socketManager::Frame()
 			BossInfo* bInfoPtr;
 			bInfoPtr = new BossInfo;
 			bInfoPtr->patternId = rand() % 5;
-			bInfoPtr->frame = currentFrame + 60;
+			bInfoPtr->frame = currentFrame + 20;
 			bInfoPtr->targetid = rand() % 2;
 
 			MsgBundle* bossMsg;
@@ -293,6 +296,7 @@ void socketManager::Frame()
 			bossMsg->type = socketManager::BOSS_INFO;
 			bossMsg->ptr = bInfoPtr;
 			clientSendBuffer.push(bossMsg);
+			printf("SENDING BOSS PATTERN FOR FRAME: %d\n", bInfoPtr->frame);
 		}
 	}
 
@@ -317,7 +321,7 @@ void socketManager::Frame()
 				{
 				case PLAYER_INFO:
 					clientSendBuffer.push(tempMsg);
-					if (!flag && blockInputFrame > 60)
+					if (!flag && blockInputFrame > 20)
 					{
 						playerInput* pInfo;
 						pInfo = (playerInput*)(tempMsg->ptr);
@@ -598,7 +602,6 @@ void socketManager::CopyPlayerInfo(playerInput* dest, playerInput* src)
 
 	dest->playerId = src->playerId;
 }
-
 
 void socketManager::CopyHpInfo(hpInfo* dest, hpInfo* src)
 {
