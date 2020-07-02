@@ -1,7 +1,10 @@
-Server: https://github.com/cjsjyh/krafton-internship-server
-Client: https://github.com/cjsjyh/krafton-internship-client
+### Server: 
+https://github.com/cjsjyh/krafton-internship-server
 
+### Client: 
+https://github.com/cjsjyh/krafton-internship-client
 
+### Intro
 <b>krafton_server</b> folder has server side code that takes care of all the parameters.
 
 #
